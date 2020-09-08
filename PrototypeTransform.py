@@ -80,7 +80,7 @@ def ndcoords(*dims):
 
 
 
-class MattTransform( ABC ):
+class Transform( ABC ):
 
     def __init__(self, name, input_coord, input_unit,
                  output_coord, output_unit, parameters,
