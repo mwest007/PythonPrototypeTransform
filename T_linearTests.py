@@ -14,8 +14,7 @@ print("================================\n")
 
 
 FunctionName = "t_linear"
-TestArray  = np.zeros((5,6))
-TestArray  += np.arange(6)
+TestArray  = np.arange(25).reshape(5, 5)
 
 class Test_TLinear(unittest.TestCase):
 
@@ -30,7 +29,7 @@ class Test_TLinear(unittest.TestCase):
         #print(output)
         numpytest = np.testing.assert_array_equal( output , expected_output )
         self.assertEqual( numpytest, None, "Should be None")
-"""
+
     def test_Tlinear_scale_scalar_dimensions(self):
         print("\nTesting :", self, " Result: . = PASS , F = FAIL , E = Error)")
         ScalarScale = 3
@@ -52,7 +51,7 @@ class Test_TLinear(unittest.TestCase):
         output = test_object.apply( TestArray )
         numpytest = np.testing.assert_array_equal( output , expected_output )
         self.assertEqual( numpytest, None, "Should be None")
-"""
+
 
 if __name__ == '__main__':
     unittest.main()
