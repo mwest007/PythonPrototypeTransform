@@ -180,16 +180,6 @@ class t_linear(Transform):
 #   also parses python arrays into numpy arrays if required. It checks for 
 #   inputs which will create errors
 
-        if ( (self.parameters['matrix'] is not None) and \
-           (self.parameters['scale'] is not None) ):
-
-            raise ValueError("Linear transform: a matrix and a scale were supplied, the transform cannot handle both. Pass separately")
-
-        if ( (self.parameters['matrix'] is not None) and \
-           (self.parameters['rot'] is not None) ):
-
-            raise ValueError("Linear transform: a matrix and a rotation parameter were supplied, the transform cannot handle both. Pass separately")
-
         if not 'matrix' in self.parameters:
             self.parameters['matrix'] = None
         if (self.parameters['matrix'] is not None): 
@@ -205,9 +195,21 @@ class t_linear(Transform):
         if not 'scale' in self.parameters:
             self.parameters['scale'] = None
         if (self.parameters['scale'] is not None): 
+
+#---Make python array 1D np array
             if type(self.parameters['scale']) is not np.ndarray:
                 self.parameters['scale'] = \
                 np.atleast_1d(np.array(self.parameters['scale']))
+
+#---If a 2D scale np.array is added (e.g. 1xX) test if it's a 1xX or a Xx1 array
+#   and make 1D
+            if self.parameters['scale'].ndim == 2:
+                if (self.parameters['scale'].shape[0] == 1) or (self.parameters['scale'].shape[1] == 1):
+                    self.parameters['scale'] = self.parameters['scale'].ravel()
+
+            if self.parameters['scale'].ndim > 1:
+                raise ValueError("transform: t_linear: scale: Scale only accepts scalars and 1D arrays")
+
 
         if not 'pre' in self.parameters:
             self.parameters['pre'] = None
@@ -225,6 +227,18 @@ class t_linear(Transform):
 
         if not 'dims' in self.parameters:
             self.parameters['dims'] = None
+
+#---Create error if marix and scale or matrix and rot
+        if ( (self.parameters['matrix'] is not None) and \
+           (self.parameters['scale'] is not None) ):
+
+            raise ValueError("Linear transform: a matrix and a scale were supplied, the transform cannot handle both. Pass separately")
+
+        if ( (self.parameters['matrix'] is not None) and \
+           (self.parameters['rot'] is not None) ):
+
+            raise ValueError("Linear transform: a matrix and a rotation parameter were supplied, the transform cannot handle both. Pass separately")
+
 
 
 #===This section uses the input parameters to determine the out put dimensions
@@ -305,9 +319,7 @@ class t_linear(Transform):
 #   values multiplied as such
 
         if (self.parameters['scale'] is not None):
-            if self.parameters['scale'].ndim > 1:
-                raise ValueError("transform: t_linear: scale: Scale only accepts scalars and 1D arrays")
-            elif self.parameters['scale'].size == 1:
+            if self.parameters['scale'].size == 1:
                 for j in range(self.parameters['matrix'].shape[0]):
                     self.parameters['matrix'][j][j] *= self.parameters['scale']
             else:
