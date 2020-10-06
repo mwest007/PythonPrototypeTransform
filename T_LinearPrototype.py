@@ -154,6 +154,7 @@ class t_linear(Transform):
     Notes
     -----
 
+    Need to add different variable names
 
     References
     ----------
@@ -233,7 +234,7 @@ class t_linear(Transform):
             if (self.parameters['matrix'].shape[1] != \
                 self.parameters['matrix'].shape[0]):
                 
-                raise ValueError("Transform: T_linear: matrix: expects a square input matrix. Stopping here")
+                raise ValueError("transform: t_linear: matrix: expects a square input matrix. Stopping here")
         else:
             if self.parameters['rot'] is not None and \
             type( self.parameters['rot'] ) is np.ndarray:
@@ -245,7 +246,7 @@ class t_linear(Transform):
                     self.input_dim = 3
                     self.output_dim = 3
                 else:
-                    raise ValueError("Transform: T_linear: rot: expected single angular rotation or three Eular angles. Stopping here")
+                    raise ValueError("transform: t_linear: rot: expected single angular rotation or three Eular angles. Stopping here")
 
             elif self.parameters['scale'] is not None and \
                  type(self.parameters['scale']) is np.ndarray or \
@@ -269,7 +270,7 @@ class t_linear(Transform):
                     self.output_dim = self.parameters['dims']
 
             else:
-                print("Transform: T_linear: dims: Insufficient dimensions specified, assuming 2-D transform")
+                print("transform: t_linear: dims: Insufficient dimensions specified, assuming 2-D transform")
                 self.input_dim = 2
                 self.output_dim = 2
 
@@ -305,7 +306,7 @@ class t_linear(Transform):
 
         if (self.parameters['scale'] is not None):
             if self.parameters['scale'].ndim > 1:
-                raise ValueError("Transform: T_linear: scale: Scale only accepts scalars and 1D arrays")
+                raise ValueError("transform: t_linear: scale: Scale only accepts scalars and 1D arrays")
             elif self.parameters['scale'].size == 1:
                 for j in range(self.parameters['matrix'].shape[0]):
                     self.parameters['matrix'][j][j] *= self.parameters['scale']
@@ -325,10 +326,31 @@ class t_linear(Transform):
 
 #===Calculate the inverse transform if possible
     def invert(self, data, padded_matrix=0):
+        """apply the inverse transform
 
-#---If invertable create inverse transform. These are applied in this order 
-#   outdata= (data - post)*inverseMatrixTransform -pre
+        If invertable creates the inverse transform for given parameters to the 
+        input array (data). The transforms are applied in this order: 
+    
+        outdata = (data - post) * inverseMatrixTransform - pre
+
+        Parameters
+        ----------
+
+        data : np.array
+  
+            array to be transformed
+
+        padded_matrix : scalar {1|0}
+
+            a scalar indicating if padding is required around the array output. 
+            This pads the output array to match the input array with values from 
+            the input array. This is useful to return inverted transforms with 
+            the initial input values and dimensions. Set to default as default. 
+        """
         if not self._non_invertible:
+
+#---Create copy of input data to avoid modifying input matrix
+            data = copy.copy(data)
 
 #---Test to see if the array dimensions are sufficient for the proposed 
 #   transform
@@ -373,6 +395,31 @@ class t_linear(Transform):
 #   (matrixTransform)*(data + pre)
     def apply(self, data, backward = 0, padded_matrix=0):
 
+        """apply the transform for given parameters to the input array (data). 
+        The transforms are applied in this order:
+    
+        outdata = (data + pre) * transform + post
+
+        Parameters
+        ----------
+
+        data : np.array
+  
+            array to be transformed
+
+        padded_matrix : scalar {1|0}
+
+            a scalar indicating if padding is required around the array output. 
+            This pads the output array to match the input array with values from 
+            the input array. This is useful to return inverted transforms with 
+            the initial input values and dimensions. Set to default as default. 
+        """
+
+
+#---Create copy of input data to avoid modifying input matrix
+        data = copy.copy(data)
+
+
 #---Test for reversible flags
         if (not backward and not self.reverse_flag) or \
            (backward and self.reverse_flag):
@@ -396,6 +443,7 @@ class t_linear(Transform):
                   copy.deepcopy(data[..., 0:matrixDimension])
 
             outdata = copy.deepcopy(dataWithPreTransform)
+
 #---Perform matrix multipliction and add post transform offset if specified.
             if self.parameters['post'] is not None:
                 outdata[..., 0:matrixDimension] = \
@@ -414,8 +462,8 @@ class t_linear(Transform):
 
     def __str__(self):
         outString =  f"Transform name: {self.name}\n"\
-                      f"Input parameters: {self.parameters}\n"\
-                      f"Non-Invertible: {self._non_invertible}\n"\
-                      f"Inverse Matrix: {self.inverseMatrix}\n"
+                     f"Input parameters: {self.parameters}\n"\
+                     f"Non-Invertible: {self._non_invertible}\n"\
+                     f"Inverse Matrix: {self.inverseMatrix}\n"
         return outString 
 
