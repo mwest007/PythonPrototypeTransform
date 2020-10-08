@@ -80,7 +80,7 @@ class Transform(ABC):
         self.reverse_flag = reverse_flag
 
 
-    def apply(self, data, backward = 0):
+    def apply(self, data, backward = 0, paddedmatrix = 1):
 
         """apply the transform for given parameters to the input array (data). 
         The transforms are applied in this order:
@@ -89,25 +89,27 @@ class Transform(ABC):
 
         Parameters
         ----------
-
         data : np.array
-  
-            array to be transformed
+              array to be transformed
 
         backward : scalar
-
             scalar {1|0} if set to 0 a forward transformation is applied, if set
             to 0 the inverse transformation is applied. The value is 
             automatically set to 0.
 
+        paddedmatrix : scalar {1|0}
+            A scalar indicating if padding is required around the array output. 
+            This pads the output array to match the input array with values from 
+            the input array. This is useful to return inverted transforms with 
+            the initial input values and dimensions. Set to default as default. 
+
+
         Raises
         ------
         transform: t_linear: apply: transform requires at least a {np.shape(data)[-1]}  dimension columns array
-
         transform: t_linear: apply: Cannot pad data to match input dimensions
-
-
         """
+
 
 #---Create copy of input data to avoid modifying input matrix
         data = copy.copy(data)
@@ -122,7 +124,7 @@ class Transform(ABC):
 
 #---Pads the output data so it matches the input data, if padded_matrix and 
 #   outdata.shape[0] < output_dim OR check if output_dim == input_dim
-        if self.parameters['padded_matrix'] :
+        if paddedmatrix :
             if outdata.ndim > 1:
                 if outdata.shape[1] < data.shape[1]:
                     if outdata.shape[0] > data.shape[0]:
@@ -167,7 +169,6 @@ class t_linear(Transform):
     t_linear accepts tranform parameters as a dictionary { parameter:value} 
 
     parameters{s, scale, Scale : np.array, python array, list or tuple 
-
         A scaling scalar, 1D vector, or matrix.  If you specify a scalar a 2-D 
         output transform is assumed. If a vector is specified it is treated as a 
         diagonal matrix (for convenience), the vector length must be less than 
@@ -180,10 +181,8 @@ class t_linear(Transform):
         skewing. A scale can not be applied together with an additional 
         transformation matrix.
 
-
-    r, rot, rota, rotation, Rotation : scalar, np.array, python array, list, 
-        tuple 
-
+    parameters{r, rot, rota, rotation, Rotation : scalar, np.array, 
+    python array, list, tuple}
         A rotation angle in degrees -- useful for 2-D and 3-D data only.  If
         you pass in a scalar, it specifies a rotation from the 0th axis toward
         the 1st axis.  If you pass in a 3-vector as either a PDL or an array
@@ -203,14 +202,13 @@ class t_linear(Transform):
         general -- by generating your own rotation matrix and feeding it in
         with the 'matrix' option.
 
-    m, matrix, Matrix: np.array, python array, list, or tuple 
-
+    parameters{m, matrix, Matrix: np.array, python array, list, or tuple} 
         The transformation matrix.  It needs to be square.  If it is invertible 
         (note: must be square for that), then you automatically get an inverse 
         transform too.
 
-    pre, preoffset, offset, Offset: np.array, python array, list, or tuple  
-
+    parameters{pre, preoffset, offset, Offset: np.array, python array, list, or 
+    tuple  }
         The vector to be added to the (mxn) data array before being multiplied 
         by any input matrix (equivalent of CRVAL in FITS, if you are converting 
         from scientific to pixel units). pre will accept: a single element vector 
@@ -219,8 +217,8 @@ class t_linear(Transform):
         corresponding rows, or a corresponding vector array of similar (mxn)
         dimensions to the input array.
 
-    post, postoffset, shift, Shift: np.array, python array, list, or tuple 
-
+    parameters{post, postoffset, shift, Shift: np.array, python array, list, or 
+    tuple}
         The vector to be added to the (mxn) data array after being multiplied 
         by any input matrix (equivalent of CRPIX-1 in FITS, if you are 
         converting from scientific to pixel units). pre will accept: a single 
@@ -229,22 +227,13 @@ class t_linear(Transform):
         broadcast over corresponding rows, or a corresponding vector array of 
         similar (m'xn') dimensions to the output array.
 
-    d, dim, dims, Dims: np.array, python array, list, or tuple 
-
+    parameters{d, dim, dims, Dims: np.array, python array, list, or tuple}
         Most of the time it is obvious how many dimensions you want to deal 
         with: if you supply a matrix, it defines the transformation; if you 
-        input offset vectors in the 'preoffset' and 'postoffset' options, those define the 
-        number of dimensions.  But if you only supply scalars, there is no way 
-        to tell, and the default number of dimensions is 2. A matrix of the same
-        size as the input array will be output.
-
-    pad, padded_matrix : scalar {1|0}
-
-        a scalar indicating if padding is required around the array output. 
-        This pads the output array to match the input array with values from 
-        the input array. This is useful to return inverted transforms with 
-        the initial input values and dimensions. Set to default as default. 
-
+        input offset vectors in the 'preoffset' and 'postoffset' options, those 
+        define the number of dimensions.  But if you only supply scalars, there 
+        is no way to tell, and the default number of dimensions is 2. A matrix 
+        of the same size as the input array will be output.
 
     Returns
     -------
@@ -334,9 +323,6 @@ class t_linear(Transform):
         if 'Matrix' in self.parameters:
             self.parameters['matrix'] = self.parameters['Matrix']
 
-        if 'pad' in self.parameters:
-            self.parameters['padded_matrix'] = self.parameters['pad']
-
         if 'post' in self.parameters:
             self.parameters['postoffset'] = self.parameters['post']
         if 'shift' in self.parameters:
@@ -365,12 +351,9 @@ class t_linear(Transform):
         if 'Scale' in self.parameters:
             self.parameters['scale'] = self.parameters['Scale']
 
-
-#===This section adds key parameters if not present and makes them 'None'. It
+#---add key parameters if not present and makes them 'None'. It
 #   also parses python arrays into numpy arrays if required. It checks for 
 #   inputs which will create errors
-
-
         if not 'matrix' in self.parameters:
             self.parameters['matrix'] = None
         if (self.parameters['matrix'] is not None): 
@@ -421,9 +404,6 @@ class t_linear(Transform):
 
         if not 'dimensions' in self.parameters:
             self.parameters['dimensions'] = None
-
-        if not 'padded_matrix' in self.parameters:
-            self.parameters['padded_matrix'] = 1
 
 
 #---Create error if marix and scale or matrix and rot
@@ -551,6 +531,7 @@ class t_linear(Transform):
         ------
         transform: t_linear: reversetransform: trying to invert a non-invertible matrix.
         """
+
 #---need to check if array is invertable and set flag. Compute the 
 #   (multiplicative) inverse of the matrix (np.linalg.inv), if not, flag.
         self._non_invertible = 0
@@ -614,8 +595,6 @@ class t_linear(Transform):
             scalar {1|0} if set to 0 a forward transformation is applied, if set
             to 0 the inverse transformation is applied. The value is 
             automatically set to 0.
-
-
         """
 
 #---Test for reversible flags

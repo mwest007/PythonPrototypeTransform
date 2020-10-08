@@ -44,14 +44,14 @@ class test_t_linear(unittest.TestCase):
         #---Inputs
         TestArray = TestArray_5x5NumpyArray
         ScalarScale = np.array([3])
-        FunctionParams = {'matrix': None, 'rot': None, 'scale': ScalarScale, 'pre': None, 'post': None, 'dims': None, 'padded_matrix':0}
+        FunctionParams = {'matrix': None, 'rot': None, 'scale': ScalarScale, 'pre': None, 'post': None, 'dims': None}
 
-        test_object = transform.t_linear( parameters = FunctionParams )
+        test_object = transform.t_linear( parameters = FunctionParams  )
 
 
         
         #---Outputs
-        output = test_object.apply(TestArray)
+        output = test_object.apply(TestArray, paddedmatrix=0)
         expected_output = np.array([[0. ], \
                                     [15.], \
                                     [30.], \
@@ -69,11 +69,11 @@ class test_t_linear(unittest.TestCase):
         #---Inputs
         TestArray = TestArray_5x5NumpyArray
         ScalarScale = np.array([3])
-        FunctionParams = {'matrix': None, 'rot': None, 'scale': ScalarScale, 'pre': None, 'post': None, 'dims': None, 'padded_matrix':1}
+        FunctionParams = {'matrix': None, 'rot': None, 'scale': ScalarScale, 'pre': None, 'post': None, 'dims': None}
         test_object = transform.t_linear( parameters = FunctionParams )
 
         #---Outputs
-        output = test_object.apply(TestArray)
+        output = test_object.apply(TestArray, paddedmatrix = 1)
         expected_output = np.array([[0.,   1.,  2.,  3.,  4.], \
                                     [15.,  6.,  7.,  8.,  9.], \
                                     [30., 11., 12., 13., 14.], \
@@ -459,6 +459,47 @@ class test_t_linear(unittest.TestCase):
         #---Tests
         numpytest = np.testing.assert_almost_equal( output , expected_output, decimal=2 )
         self.assertEqual( numpytest, None, "Should be None") 
+
+
+    def test_t_linear_pre_100(self):
+        print("\nTesting :", self)
+
+        #---Inputs
+        TestArray = TestArray_3x3NumpyArray
+        preTest = 100.
+        FunctionParams = {'pre': preTest}
+        test_object = transform.t_linear( parameters = FunctionParams , reverse_flag = 0 )
+
+        #---Outputs
+        output = test_object.apply(TestArray )
+        expected_output = np.array([[100,    101,     2], \
+                                    [   103,    104,    5], \
+                                    [   106,     107,    8]])
+
+
+    def test_t_linear_pre_100_no_pad(self):
+        print("\nTesting :", self)
+
+        #---Inputs
+        TestArray = TestArray_3x3NumpyArray
+        preTest = 100.
+        FunctionParams = {'pre': preTest}
+        test_object = transform.t_linear( parameters = FunctionParams )
+
+        #---Outputs
+        output = test_object.apply(TestArray )
+        expected_output = np.array([[100,    101,     2], \
+                                    [   103,    104,    5], \
+                                    [   106,     107,    8]])
+
+
+
+        #---Tests
+        numpytest = np.testing.assert_almost_equal( output , expected_output, decimal=2 )
+        self.assertEqual( numpytest, None, "Should be None") 
+
+
+
 
 def run_specific_tests():
     """Tests to complete
