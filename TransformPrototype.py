@@ -12,6 +12,64 @@ __maintainer__ = "Matthew J West"
 __email__ = "mwest at swri.boulder.edu"
 __status__ = "Production"
 
+
+def ndcoords(*dims):
+    """Returns an enumerated list of coordinates for given dimensions
+
+    Returns an enumerated list of coordinates for given dimensions, initizilzed 
+    to a tuple, adding an extra dim on the front to accommodate
+    the vector coordinate index
+
+    Parameters
+    ----------
+    *dims : tuple, list or numpy array dimensions of the input array
+
+    Returns
+    -------
+    array(float64)
+
+    Usage
+    ----- 
+    $indices = ndcoords($tuple)
+    $indices = ndcoords($list)
+    $indices = ndcoords(np.ndarray())
+
+    Notes
+    -----
+    Enumerate pixel coordinates for an N-D variable, you feed
+    in a dimension list and get out a piddle whose 0th dimension runs over
+    dimension index and whose 1st through Nth dimensions are the
+    dimensions given in the input.  If you feed in a piddle instead of a
+    perl list.
+
+    Examples
+    --------
+    >>> print(ndcoords([3,2]))
+    >>> [[[0. 0.]
+    >>>   [1. 0.]
+    >>>   [2. 0.]]
+    >>> 
+    >>>  [[0. 1.]
+    >>>   [1. 1.]
+    >>>   [2. 1.]]]
+    """
+
+    grid_size = []
+    if type(dims[0]) is tuple \
+    or type(dims[0]) is list \
+    or type(dims[0]) is np.ndarray:
+        for i in range(len(dims[0])):
+            grid_size.append(range(dims[0][i]))
+    else:
+        for i in range(len(dims)):
+            grid_size.append(range(dims[i]))
+
+    out = np.mgrid[grid_size]
+
+    out = out.astype('float64').transpose()
+    return out
+
+
 class Transform(ABC):
     def __init__(self, name, parameters, reverse_flag):
  
