@@ -79,17 +79,61 @@ class Transform(ABC):
         self.parameters = parameters
         self.reverse_flag = reverse_flag
 
-    def inverse(self):
-        pass
 
-    @abstractmethod
     def apply(self, data, backward = 0):
-        return copy.deepcopy(data)
 
-#---The invert 
-    @abstractmethod
-    def invert(self, data):
-        return copy.deepcopy(data)
+        """apply the transform for given parameters to the input array (data). 
+        The transforms are applied in this order:
+    
+        outdata = (data + pre) * transform + post
+
+        Parameters
+        ----------
+
+        data : np.array
+  
+            array to be transformed
+
+        backward : scalar
+
+            scalar {1|0} if set to 0 a forward transformation is applied, if set
+            to 0 the inverse transformation is applied. The value is 
+            automatically set to 0.
+
+        Raises
+        ------
+        transform: t_linear: apply: transform requires at least a {np.shape(data)[-1]}  dimension columns array
+
+        transform: t_linear: apply: Cannot pad data to match input dimensions
+
+
+        """
+
+#---Create copy of input data to avoid modifying input matrix
+        data = copy.copy(data)
+
+        matrixDimension = self.parameters['matrix'].shape[0]
+        if matrixDimension > np.shape(data)[-1]:
+            raise ValueError(f"transform: t_linear: invert: transform requires at least a {np.shape(data)[-1]}  dimension columns array ")
+
+
+#---Perform the transform
+        outdata = self.forwardtransform(data, backward)
+
+#---Pads the output data so it matches the input data, if padded_matrix and 
+#   outdata.shape[0] < output_dim OR check if output_dim == input_dim
+        if self.parameters['padded_matrix'] :
+            if outdata.ndim > 1:
+                if outdata.shape[1] < data.shape[1]:
+                    if outdata.shape[0] > data.shape[0]:
+                        raise ValueError(f"transform: t_linear: apply: Cannot pad data to match input dimensions")
+                    paddeddata = data
+                    paddeddata[0:outdata.shape[0], 0:outdata.shape[1]] = outdata
+                    outdata = paddeddata
+
+        return outdata
+
+
 
 #    @abstractmethod
 #    def inputDataShape( self, data, backward = 0 ):
@@ -485,17 +529,10 @@ class t_linear(Transform):
                     self.parameters['matrix'][j] *= \
                     self.parameters['scale'][j]
 
-#---need to check if array is invertable and set flag. Compute the 
-#   (multiplicative) inverse of the matrix (np.linalg.inv), if not, flag.
-        self._non_invertible = 0
-        try:
-            self.inverseMatrix = np.linalg.inv(self.parameters['matrix'])
-        except np.linalg.LinAlgError:
-            self.inverseMatrix = None
-            self._non_invertible = 1
 
 #===Calculate the inverse transform if possible
-    def invert(self, data):
+    def reversetransform(self, data):
+
         """apply the inverse transform
 
         If invertable creates the inverse transform for given parameters to the 
@@ -512,21 +549,23 @@ class t_linear(Transform):
 
         Raises
         ------
-        transform: t_linear: invert: transform requires at least a {np.shape(data)[-1]}  dimension columns array
-
-        transform: t_linear: invert: Cannot pad data to match input dimensions
-
+        transform: t_linear: reversetransform: trying to invert a non-invertible matrix.
         """
-        if not self._non_invertible:
+#---need to check if array is invertable and set flag. Compute the 
+#   (multiplicative) inverse of the matrix (np.linalg.inv), if not, flag.
+        self._non_invertible = 0
+        try:
+            self.inverseMatrix = np.linalg.inv(self.parameters['matrix'])
+        except np.linalg.LinAlgError:
+            self.inverseMatrix = None
+            self._non_invertible = 1
 
-#---Create copy of input data to avoid modifying input matrix
-            data = copy.copy(data)
+
+        if not self._non_invertible:
 
 #---Test to see if the array dimensions are sufficient for the proposed 
 #   transform
             matrixDimension = self.parameters['matrix'].shape[0]
-            if matrixDimension > np.shape(data)[-1]:
-                raise ValueError(f"transform: t_linear: invert: transform requires at least a {np.shape(data)[-1]}  dimension columns array ")
 
 #---Create a deep copy of the data and remove any post transformation is specified
             if self.parameters['postoffset'] is not None:
@@ -549,27 +588,14 @@ class t_linear(Transform):
                 dataWithoutPreTransform = \
                 np.matmul(dataWithoutPostTransform, self.inverseMatrix)
 
-            outdata = copy.copy(dataWithoutPreTransform)
-
-#---Pads the output data so it matches the input data, if padded_matrix and 
-#   outdata.shape[0] < output_dim OR check if output_dim == input_dim
-            if self.parameters['padded_matrix'] :
-                if outdata.ndim > 1:
-                    if outdata.shape[1] < data.shape[1]:
-                        if outdata.shape[0] > data.shape[0]:
-                            raise ValueError(f"transform: t_linear: invert: Cannot pad data to match input dimensions")
-                    
-                        paddeddata = data
-                        paddeddata[0:outdata.shape[0], 0:outdata.shape[1]] = outdata
-                        outdata = paddeddata
+            outdata = dataWithoutPreTransform
 
             return outdata
 
         else:
-            print("trying to invert a non-invertible matrix.")
+            raise ValueError("transform: t_linear: reversetransform: trying to invert a non-invertible matrix.")
 
-
-    def apply(self, data, backward = 0):
+    def forwardtransform(self, data, backward):
 
         """apply the transform for given parameters to the input array (data). 
         The transforms are applied in this order:
@@ -589,17 +615,8 @@ class t_linear(Transform):
             to 0 the inverse transformation is applied. The value is 
             automatically set to 0.
 
-        Raises
-        ------
-        transform: t_linear: apply: transform requires at least a {np.shape(data)[-1]}  dimension columns array
-
-        transform: t_linear: apply: Cannot pad data to match input dimensions
-
 
         """
-
-#---Create copy of input data to avoid modifying input matrix
-        data = copy.copy(data)
 
 #---Test for reversible flags
         if (not backward and not self.reverse_flag) or \
@@ -607,9 +624,6 @@ class t_linear(Transform):
 
 #---Test to see if the array dimensions are sufficient for the proposed transform
             matrixDimension = self.parameters['matrix'].shape[0]
-            #print(self.parameters['matrix'])
-            if matrixDimension > np.shape(data)[-1]:
-                raise ValueError(f"Transform: T_linear: apply: transform requires at least a {np.shape(data)[-1]}  dimension columns array ")
 
 #---Create a deep copy of the data array and add the pre transform offset if 
 #   specified. Read out the resulting array
@@ -622,7 +636,7 @@ class t_linear(Transform):
                 dataWithPreTransform = \
                   copy.copy(data[..., 0:matrixDimension])
 
-            outdata = copy.copy(dataWithPreTransform)
+            outdata = dataWithPreTransform
 
 #---Perform matrix multipliction and add post transform offset if specified.
             if self.parameters['postoffset'] is not None:
@@ -632,24 +646,11 @@ class t_linear(Transform):
             else:
                 outdata[..., 0:matrixDimension] = \
                 np.matmul(dataWithPreTransform, self.parameters['matrix'])
-
-            
-#---Pads the output data so it matches the input data, if padded_matrix and 
-#   outdata.shape[0] < output_dim OR check if output_dim == input_dim
-            if self.parameters['padded_matrix'] :
-                if outdata.ndim > 1:
-                    if outdata.shape[1] < data.shape[1]:
-                        if outdata.shape[0] > data.shape[0]:
-                            raise ValueError(f"transform: t_linear: apply: Cannot pad data to match input dimensions")
-                    
-                        paddeddata = data
-                        paddeddata[0:outdata.shape[0], 0:outdata.shape[1]] = outdata
-                        outdata = paddeddata
-            
+    
             return outdata
-        
+
         else:
-            return self.invert( data )
+            return self.reversetransform( data )
 
 
     def __str__(self):

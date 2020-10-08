@@ -45,7 +45,10 @@ class test_t_linear(unittest.TestCase):
         TestArray = TestArray_5x5NumpyArray
         ScalarScale = np.array([3])
         FunctionParams = {'matrix': None, 'rot': None, 'scale': ScalarScale, 'pre': None, 'post': None, 'dims': None, 'padded_matrix':0}
-        test_object = transform.t_linear( parameters = FunctionParams , reverse_flag = 0 )
+
+        test_object = transform.t_linear( parameters = FunctionParams )
+
+
         
         #---Outputs
         output = test_object.apply(TestArray)
@@ -67,7 +70,7 @@ class test_t_linear(unittest.TestCase):
         TestArray = TestArray_5x5NumpyArray
         ScalarScale = np.array([3])
         FunctionParams = {'matrix': None, 'rot': None, 'scale': ScalarScale, 'pre': None, 'post': None, 'dims': None, 'padded_matrix':1}
-        test_object = transform.t_linear( parameters = FunctionParams , reverse_flag = 0 )
+        test_object = transform.t_linear( parameters = FunctionParams )
 
         #---Outputs
         output = test_object.apply(TestArray)
@@ -286,7 +289,7 @@ class test_t_linear(unittest.TestCase):
 
         #---Outputs
         output = test_object.apply(TestArray )
-        output = test_object.invert(output )
+        output = test_object.apply(output , backward=1 )
 
         expected_output = TestArray
         
@@ -310,8 +313,8 @@ class test_t_linear(unittest.TestCase):
         test_object = transform.t_linear( parameters = FunctionParams , reverse_flag = 0 )
 
         #---Outputs
-        output = test_object.apply(TestArray )
-        output = test_object.invert(output )
+        output = test_object.apply(TestArray)
+        output = test_object.apply(output, backward=1)
 
         expected_output = TestArray
         
@@ -417,25 +420,45 @@ class test_t_linear(unittest.TestCase):
         numpytest = np.testing.assert_array_equal( output , expected_output )
         self.assertEqual( numpytest, None, "Should be None")
 
-    def test_ndcoords_3x2(self):
+
+    def test_t_linear_rot_30_padded_reverse_flag(self):
         print("\nTesting :", self)
 
         #---Inputs
-        TestArray = (3,2)
+        TestArray = TestArray_3x3NumpyArray
+        rotScale = 30.
+        FunctionParams = {'rot': rotScale}
+        test_object = transform.t_linear( parameters = FunctionParams , reverse_flag = 1 )
 
         #---Outputs
-        output = transform.ndcoords( TestArray )
-
-        expected_output = np.array([[[ 0.0 , 0.0], \
-                                    [ 1.0 , 0.0 ], \
-                                    [ 2.0 , 0.0 ]]])
+        output = test_object.apply(TestArray )
+        expected_output = np.array([[-0.5 ,  0.87,  2.  ],\
+                                    [ 0.6 ,  4.96,  5.  ],\
+                                    [ 1.7 ,  9.06,  8.  ]])
         
         #---Tests
-        numpytest = np.testing.assert_array_equal( output , expected_output )
-        self.assertEqual( numpytest, None, "Should be None")
+        numpytest = np.testing.assert_almost_equal( output , expected_output, decimal=2 )
+        self.assertEqual( numpytest, None, "Should be None") 
 
 
+    def test_t_linear_rot_30_padded_no_flag(self):
+        print("\nTesting :", self)
 
+        #---Inputs
+        TestArray = TestArray_3x3NumpyArray
+        rotScale = 30.
+        FunctionParams = {'rot': rotScale}
+        test_object = transform.t_linear( parameters = FunctionParams )
+
+        #---Outputs
+        output = test_object.apply(TestArray )
+        expected_output = np.array([[0.50,  0.87,  2.], \
+                                    [4.59,  1.96,  5.], \
+                                    [8.70,  3.06,  8.]])
+        
+        #---Tests
+        numpytest = np.testing.assert_almost_equal( output , expected_output, decimal=2 )
+        self.assertEqual( numpytest, None, "Should be None") 
 
 def run_specific_tests():
     """Tests to complete
