@@ -111,18 +111,18 @@ class test_t_linear(unittest.TestCase):
 
         #---Inputs
         TestArray = TestArray_5x5NumpyArray
-        ScalarScale = np.array([3])
+        ScalarScale = 3
         dimsScale = 3
         FunctionParams = {'matrix': None, 'rot': None, 'scale': ScalarScale, 'pre': None, 'post': None, 'dims': dimsScale}
         test_object = transform.t_linear( parameters = FunctionParams , reverse_flag = 0 )
 
         #---Outputs
         output = test_object.apply(TestArray)
-        expected_output = np.array([[0.,   1.,  2.,  3.,  4.], \
-                                    [15.,  6.,  7.,  8.,  9.], \
-                                    [30., 11., 12., 13., 14.], \
-                                    [45., 16., 17., 18., 19.], \
-                                    [60., 21., 22., 23., 24.]])
+        expected_output = np.array([[0.,   3.,  2.,  3.,  4.], \
+                                    [15., 18.,  7.,  8.,  9.], \
+                                    [30., 33., 12., 13., 14.], \
+                                    [45., 48., 17., 18., 19.], \
+                                    [60., 63., 22., 23., 24.]])
         
         #---Tests
         numpytest = np.testing.assert_array_equal( output , expected_output )

@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from scipy.spatial.transform import Rotation
+from scipy.interpolate import interpn
 import numpy as np
 import copy
 
@@ -79,30 +80,22 @@ class Transform(ABC):
         self.parameters = parameters
         self.reverse_flag = reverse_flag
 
-
     def apply(self, data, backward = 0, paddedmatrix = 1):
-
         """apply the transform for given parameters to the input array (data). 
-        The transforms are applied in this order:
-    
-        outdata = (data + pre) * transform + post
-
+        
         Parameters
         ----------
         data : np.array
               array to be transformed
-
         backward : scalar
             scalar {1|0} if set to 0 a forward transformation is applied, if set
             to 0 the inverse transformation is applied. The value is 
             automatically set to 0.
-
         paddedmatrix : scalar {1|0}
             A scalar indicating if padding is required around the array output. 
             This pads the output array to match the input array with values from 
             the input array. This is useful to return inverted transforms with 
             the initial input values and dimensions. Set to default as default. 
-
 
         Raises
         ------
@@ -110,14 +103,10 @@ class Transform(ABC):
         transform: t_linear: apply: Cannot pad data to match input dimensions
         """
 
-
-#---Create copy of input data to avoid modifying input matrix
         data = copy.copy(data)
-
         matrixDimension = self.parameters['matrix'].shape[0]
         if matrixDimension > np.shape(data)[-1]:
             raise ValueError(f"transform: t_linear: invert: transform requires at least a {np.shape(data)[-1]}  dimension columns array ")
-
 
 #---Perform the transform
         outdata = self.forwardtransform(data, backward)
@@ -136,10 +125,62 @@ class Transform(ABC):
         return outdata
 
 
+    def map(self, data=None, template=None, opts=None):
+        """return map of given data. 
+        
+        Parameters
+        ----------
+        data : np.array
+              array to be mapped
+        template : None
+        opts : None
+
+        Raises
+        ------
+        """
+#---make the output dimensions the same as the data shape
+        self.output_dim = data.shape
+
+#---Create an output array of same dimensions as the input array and fill with floating point values
+        output = np.empty(shape=self.output_dim, dtype=np.float64)
+
+#---Create dimensions 
+        output_dim = output.shape
+
+#---Returns an enumerated list of coordinates for given dimensions
+        ndc = ndcoords(output_dim)
+        print("HERE")
+        print(ndc.shape)
+        print(ndc[0,0], ndc[0,1], ndc[0,2])
+        # ndc = ndc.reshape((np.product(ndc.shape[:-1]), ndc.shape[-1]))
+
+#---Here we apply the transform 
+        inverseCoordinates = self.apply(ndc, backward=1)
+        pixel_grid = [np.arange(coordinates) for coordinates in data.shape]
+        #print(interpolate)
+#---Interpolated array - Multidimensional interpolation on regular grids.
+        x = interpn(points=pixel_grid, values=data, method='linear', xi=inverseCoordinates, bounds_error=False, fill_value=0)
+
+        """
+        points - The points defining the regular grid in n dimensions.
+        values - The data on the regular grid in n dimensions.
+        xi - The coordinates to sample the gridded data at
+        method - The method of interpolation to perform. Supported are “linear” and “nearest”, and “splinef2d”. “splinef2d” is only supported for 2-dimensional data.
+        bounds_error - If True, when interpolated values are requested outside of the domain of the input data, a ValueError is raised. If False, then fill_value is used.
+        fill_value - If provided, the value to use for points outside of the interpolation domain. If None, values outside the domain are extrapolated. Extrapolation is not supported by method “splinef2d”.
+        """
+
+        output[:] = x
+
+#---Return the transpose of the array
+        return output.transpose()
+
+
 
 #    @abstractmethod
 #    def inputDataShape( self, data, backward = 0 ):
 #        pass
+
 
 
 
@@ -300,15 +341,13 @@ class t_linear(Transform):
     array([[0.50,  0.87,  2.],
            [4.59,  1.96,  5.],
            [8.70,  3.06,  8.]])
-
-
     """
 
     def __init__(self, parameters, reverse_flag = None, name = 't_linear'):
         super().__init__(name, parameters, reverse_flag=reverse_flag)
 
 
-#===allows for variable variable names
+#---allows for variable variable names
         if 'd' in self.parameters:
             self.parameters['dimensions'] = self.parameters['d']
         if 'dim' in self.parameters:
@@ -368,6 +407,14 @@ class t_linear(Transform):
 
         if not 'scale' in self.parameters:
             self.parameters['scale'] = None
+
+        if self.parameters['scale'] is not None and \
+                 type(self.parameters['scale']) is int or \
+                 type(self.parameters['scale']) is float or \
+                 type(self.parameters['scale']) is complex :
+
+            self.parameters['scale'] = np.atleast_1d(self.parameters['scale'],self.parameters['scale'])
+        
         if self.parameters['scale'] is not None and \
                  type(self.parameters['scale']) is np.ndarray or \
                  type(self.parameters['scale']) is list or \
@@ -379,8 +426,9 @@ class t_linear(Transform):
                 if (self.parameters['scale'].shape[0] == 1) or (self.parameters['scale'].shape[1] == 1):
                     self.parameters['scale'] = self.parameters['scale'].ravel()
 
-            if self.parameters['scale'].ndim > 1:
+            if self.parameters['scale'].ndim > 2:
                 raise ValueError("transform: t_linear: scale: Scale only accepts scalars and 1D arrays")
+
 
         if not 'preoffset' in self.parameters:
             self.parameters['preoffset'] = None
@@ -405,7 +453,6 @@ class t_linear(Transform):
         if not 'dimensions' in self.parameters:
             self.parameters['dimensions'] = None
 
-
 #---Create error if marix and scale or matrix and rot
         if ( (self.parameters['matrix'] is not None) and \
            (self.parameters['scale'] is not None) ):
@@ -417,8 +464,7 @@ class t_linear(Transform):
 
             raise ValueError("Linear transform: a matrix and a rotation parameter were supplied, the transform cannot handle both. Pass separately")
 
-
-#===This section uses the input parameters to determine the out put dimensions
+#---This section uses the input parameters to determine the out put dimensions
         if self.parameters['matrix'] is not None:
             self.input_dim = self.parameters['matrix'].shape[0]
             self.output_dim = self.parameters['matrix'].shape[1]
@@ -476,7 +522,7 @@ class t_linear(Transform):
 
             np.fill_diagonal(self.parameters['matrix'], 1)
 
-#===If rotation matrix is specified apply rotation and multiply by identify 
+#---If rotation matrix is specified apply rotation and multiply by identify 
 #   matrix 
         if self.parameters['rotation'] is not None :
 
@@ -497,9 +543,8 @@ class t_linear(Transform):
               np.matmul(self.parameters['matrix'], rot_matrix)
 
 
-#===Applies a scale, if scale is not an array, scale is treated as a scalar and 
+#---Applies a scale, if scale is not an array, scale is treated as a scalar and 
 #   values multiplied as such
-
         if (self.parameters['scale'] is not None):
             if self.parameters['scale'].size == 1:
                 for j in range(self.parameters['matrix'].shape[0]):
@@ -514,17 +559,13 @@ class t_linear(Transform):
     def reversetransform(self, data):
 
         """apply the inverse transform
-
         If invertable creates the inverse transform for given parameters to the 
         input array (data). The transforms are applied in this order: 
-    
-        outdata = (data - post) * inverseMatrixTransform - pre
+            outdata = (data - post) * inverseMatrixTransform - pre
 
         Parameters
         ----------
-
         data : np.array
-  
             array to be transformed
 
         Raises
@@ -580,18 +621,14 @@ class t_linear(Transform):
 
         """apply the transform for given parameters to the input array (data). 
         The transforms are applied in this order:
-    
-        outdata = (data + pre) * transform + post
+            outdata = (data + pre) * transform + post
 
         Parameters
         ----------
-
         data : np.array
-  
             array to be transformed
 
         backward : scalar
-
             scalar {1|0} if set to 0 a forward transformation is applied, if set
             to 0 the inverse transformation is applied. The value is 
             automatically set to 0.
@@ -633,9 +670,23 @@ class t_linear(Transform):
 
 
     def __str__(self):
-        outString =  f"Transform name: {self.name}\n"\
-                     f"Input parameters: {self.parameters}\n"\
-                     f"Non-Invertible: {self._non_invertible}\n"\
-                     f"Inverse Matrix: {self.inverseMatrix}\n"
+        outString = f"Transform name: {self.name}\n"\
+                    f"Input parameters: {self.parameters}\n"\
+                    f"Non-Invertible: {self._non_invertible}\n"\
+                    f"Inverse Matrix: {self.inverseMatrix}\n"\
+                    f"matrix:{self.parameters['matrix']}\n"\
+                    f"scale:{self.parameters['scale']}\n"\
+                    f"rot: "f"{self.parameters['rot']}\n"\
+                    f"pre: {self.parameters['pre']}\n"\
+                    f"post: {self.parameters['post']}\n"\
+                    f"dims: {self.parameters['dims']}\n"\
+                    f"Reverse Flag: {self.reverse_flag}\n"\
+                    f"Non-Invertible: {self._non_invertible}"
+                    #f"Input Coord: {self.input_coord}\n"
+                    #f"Input Unit:{self.input_unit}\n"
+                    #f"Output Coord: {self.output_coord}\n"
+                    #f"Output Units: {self.output_unit}\n"
+                    #f"Input Dim: {self.input_dim}\n"
+                    #f"Output Dim: {self.output_dim}"
         return outString 
 
