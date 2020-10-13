@@ -149,17 +149,18 @@ class Transform(ABC):
 
 #---Returns an enumerated list of coordinates for given dimensions
         ndc = ndcoords(output_dim)
-        print("HERE")
-        print(ndc.shape)
-        print(ndc[0,0], ndc[0,1], ndc[0,2])
         # ndc = ndc.reshape((np.product(ndc.shape[:-1]), ndc.shape[-1]))
 
 #---Here we apply the transform 
-        inverseCoordinates = self.apply(ndc, backward=1)
+        inverseTransform = self.apply(ndc, backward=1)
+        
         pixel_grid = [np.arange(coordinates) for coordinates in data.shape]
-        #print(interpolate)
+        print(len(pixel_grid))
+        print(pixel_grid)
+        #print(pixel_grid[1:5,1:5])
+
 #---Interpolated array - Multidimensional interpolation on regular grids.
-        x = interpn(points=pixel_grid, values=data, method='linear', xi=inverseCoordinates, bounds_error=False, fill_value=0)
+        x = interpn(points=pixel_grid, values=data, method='linear', xi=inverseTransform, bounds_error=False, fill_value=0)
 
         """
         points - The points defining the regular grid in n dimensions.
