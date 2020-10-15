@@ -323,7 +323,7 @@ class test_t_linear(unittest.TestCase):
         self.assertEqual( numpytest, None, "Should be None") 
 
 
-    def test_t_linear_rot_30_pad_back_reverse(self):
+    def test_t_linear_r30_pad_back_reverse(self):
         print("\nTesting :", self)
 
         #---Inputs
@@ -342,7 +342,7 @@ class test_t_linear(unittest.TestCase):
         numpytest = np.testing.assert_almost_equal( output , expected_output, decimal=2 )
         self.assertEqual( numpytest, None, "Should be None") 
 
-    def test_t_linear_rot_30_pad_reverse(self):
+    def test_t_linear_r30_pad_reverse(self):
         print("\nTesting :", self)
 
         #---Inputs
@@ -361,7 +361,7 @@ class test_t_linear(unittest.TestCase):
         numpytest = np.testing.assert_almost_equal( output , expected_output, decimal=2 )
         self.assertEqual( numpytest, None, "Should be None") 
 
-    def test_t_linear_rot_30_pad_back(self):
+    def test_t_linear_r30_pad_back(self):
         print("\nTesting :", self)
 
         #---Inputs
@@ -382,7 +382,7 @@ class test_t_linear(unittest.TestCase):
         self.assertEqual( numpytest, None, "Should be None") 
 
 
-    def test_t_linear_rot_30_pad_forward_and_back(self):
+    def test_t_linear_r30_pad_forward_and_back(self):
         print("\nTesting :", self)
 
         #---Inputs
@@ -421,7 +421,7 @@ class test_t_linear(unittest.TestCase):
         self.assertEqual( numpytest, None, "Should be None")
 
 
-    def test_t_linear_rot_30_padded_reverse_flag(self):
+    def test_t_linear_r30_padded_reverse_flag(self):
         print("\nTesting :", self)
 
         #---Inputs
@@ -441,7 +441,7 @@ class test_t_linear(unittest.TestCase):
         self.assertEqual( numpytest, None, "Should be None") 
 
 
-    def test_t_linear_rot_30_padded_no_flag(self):
+    def test_t_linear_r30_padded_no_flag(self):
         print("\nTesting :", self)
 
         #---Inputs
@@ -461,7 +461,7 @@ class test_t_linear(unittest.TestCase):
         self.assertEqual( numpytest, None, "Should be None") 
 
 
-    def test_t_linear_pre_100(self):
+    def test_t_linear_pre100(self):
         print("\nTesting :", self)
 
         #---Inputs
@@ -477,7 +477,7 @@ class test_t_linear(unittest.TestCase):
                                     [   106,     107,    8]])
 
 
-    def test_t_linear_pre_100_no_pad(self):
+    def test_t_linear_pre100_no_pad(self):
         print("\nTesting :", self)
 
         #---Inputs
@@ -492,11 +492,58 @@ class test_t_linear(unittest.TestCase):
                                     [   103,    104,    5], \
                                     [   106,     107,    8]])
 
-
-
         #---Tests
         numpytest = np.testing.assert_almost_equal( output , expected_output, decimal=2 )
         self.assertEqual( numpytest, None, "Should be None") 
+
+
+    def test_t_linear_repr_r30_s5(self):
+        print("\nTesting :", self)
+
+        #---Inputs
+        FunctionParams = {'rot':30, 'scale':5}
+        test_object = transform.t_linear( parameters = FunctionParams )
+
+        #---Outputs
+        output = repr(test_object)
+        expected_output = "t_linear(parameters={'scale': ([5, 5]), 'rotation': (30), 'matrix': None, 'preoffset': None, 'postoffset': None, 'dimensions': None}, reverse_flag=None, input_coord=None, input_unit=None, output_coord=None, output_unit=None, input_dim=2, output_dim=2)"
+
+        #---Tests
+        self.assertEqual( output, expected_output, "Should be resuable repr string") 
+
+
+    def test_t_linear_r30_scale(self):
+        print("\nTesting :", self)
+
+        #---Inputs
+        FunctionParams = {'rot':30}
+        test_object = transform.t_linear( parameters = FunctionParams )
+
+        #---Outputs
+        output = repr(test_object)
+        expected_output = "t_linear(parameters={'rotation': (30), 'matrix': None, 'scale': None, 'preoffset': None, 'postoffset': None, 'dimensions': None}, reverse_flag=None, input_coord=None, input_unit=None, output_coord=None, output_unit=None, input_dim=2, output_dim=2)"
+
+        #---Tests
+        self.assertEqual( output, expected_output, "Should be resuable repr string") 
+
+
+    def test_t_linear_repr_s5(self):
+        print("\nTesting :", self)
+
+        #---Inputs
+        TestArray = TestArray_3x3NumpyArray
+        preTest = 100.
+        FunctionParams = {'scale':5}
+        test_object = transform.t_linear( parameters = FunctionParams )
+
+        #---Outputs
+        output = repr(test_object)
+        expected_output = "t_linear(parameters={'scale': ([5, 5]), 'matrix': None, 'rotation': None, 'preoffset': None, 'postoffset': None, 'dimensions': None}, reverse_flag=None, input_coord=None, input_unit=None, output_coord=None, output_unit=None, input_dim=2, output_dim=2)"
+
+        #---Tests
+        self.assertEqual( output, expected_output, "Should be resuable repr string") 
+
+
 
 
 

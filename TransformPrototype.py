@@ -3,6 +3,7 @@ from scipy.spatial.transform import Rotation
 from scipy.interpolate import interpn
 import numpy as np
 import copy
+import reprlib
 
 __author__ = "Matthew J West, Craig DeForest, Jake-R-W"
 __copyright__ = "By all the listed autors: GPLv2, There is no warranty."
@@ -12,6 +13,8 @@ __version__ = "1.0.0"
 __maintainer__ = "Matthew J West"
 __email__ = "mwest at swri.boulder.edu"
 __status__ = "Production"
+
+
 
 
 def ndcoords(*dims):
@@ -72,13 +75,31 @@ def ndcoords(*dims):
 
 
 class Transform(ABC):
-    def __init__(self, name, parameters, reverse_flag):
- 
-#    def __init__(, , input_coord, input_unit, output_coord, output_unit, 
-#                 , , input_dim = None, output_dim = None):
+    def __init__(self, name, parameters, reverse_flag, input_coord=None, 
+        input_unit=None, output_coord=None, output_unit=None, input_dim=None,
+        output_dim=None):
+        """
+        :type name: str
+        :type parameters: dict
+        :type reverse_flag: bool
+        :type input_coord: list
+        :type input_unit: astropy.units
+        :type output_coord: np.array
+        :type output_unit: astropy.units
+        :type input_dim: int
+        :type output_dim: int
+        """
         self.name = name
         self.parameters = parameters
         self.reverse_flag = reverse_flag
+        self.input_coord = input_coord
+        self.input_unit = input_unit
+        self.output_coord = output_coord
+        self.output_unit = output_unit
+        self.input_dim = input_dim
+        self.output_dim = output_dim
+        self._non_invertible = 0
+
 
     def apply(self, data, backward = 0, paddedmatrix = 1):
         """apply the transform for given parameters to the input array (data). 
@@ -126,7 +147,31 @@ class Transform(ABC):
 
 
     def map(self, data=None, template=None, opts=None):
-        """return map of given data. 
+        """return map of given data.
+
+        1. find shape of input array (e.g. 1024 x 1024), or take an input 
+        2. Create an empty array of this shape (output)
+        3. Find dimensions of this shape - which may or may not be the same as 
+        the input shape
+        4. use ndc coords to make a list of enumerated list of coordinates for 
+        given dimensions
+        5. create the inverse transform
+        6. create a pixel grid, which will be used to define The points defining
+        the regular grid in n dimensions. E.g. pixel_grig creates a 2x1024 array
+        7. Interpolate the date, using interpn, this uses the options:
+          points - The points defining the regular grid in n dimensions.
+          values - The data on the regular grid in n dimensions.
+          xi - The coordinates to sample the gridded data at
+          method - The method of interpolation to perform. Supported are 
+          “linear” and “nearest”, and “splinef2d”. “splinef2d” is only supported
+          for 2-dimensional data.
+          bounds_error - If True, when interpolated values are requested outside
+          of the domain of the input data, a ValueError is raised. If False, 
+          then fill_value is used.
+          fill_value - If provided, the value to use for points outside of the 
+          interpolation domain. If None, values outside the domain are 
+          extrapolated. Extrapolation is not supported by method “splinef2d”.
+        8. Take the transpose
         
         Parameters
         ----------
@@ -138,45 +183,52 @@ class Transform(ABC):
         Raises
         ------
         """
-#---make the output dimensions the same as the data shape
-        self.output_dim = data.shape
 
-#---Create an output array of same dimensions as the input array and fill with floating point values
-        output = np.empty(shape=self.output_dim, dtype=np.float64)
-
-#---Create dimensions 
-        output_dim = output.shape
-
-#---Returns an enumerated list of coordinates for given dimensions
-        ndc = ndcoords(output_dim)
-        # ndc = ndc.reshape((np.product(ndc.shape[:-1]), ndc.shape[-1]))
-
-#---Here we apply the transform 
-        inverseTransform = self.apply(ndc, backward=1)
-        
-        pixel_grid = [np.arange(coordinates) for coordinates in data.shape]
-        print(len(pixel_grid))
-        print(pixel_grid)
-        #print(pixel_grid[1:5,1:5])
-
-#---Interpolated array - Multidimensional interpolation on regular grids.
-        x = interpn(points=pixel_grid, values=data, method='linear', xi=inverseTransform, bounds_error=False, fill_value=0)
-
-        """
-        points - The points defining the regular grid in n dimensions.
-        values - The data on the regular grid in n dimensions.
-        xi - The coordinates to sample the gridded data at
-        method - The method of interpolation to perform. Supported are “linear” and “nearest”, and “splinef2d”. “splinef2d” is only supported for 2-dimensional data.
-        bounds_error - If True, when interpolated values are requested outside of the domain of the input data, a ValueError is raised. If False, then fill_value is used.
-        fill_value - If provided, the value to use for points outside of the interpolation domain. If None, values outside the domain are extrapolated. Extrapolation is not supported by method “splinef2d”.
-        """
-
-        output[:] = x
-
-#---Return the transpose of the array
+        if template is not None:
+            self.output_dim = template
+        else:
+            self.output_dim = data.shape
+            output = np.empty(shape=self.output_dim, dtype=np.float64)
+            output_dim = output.shape
+            enumeratedCoordinates = ndcoords(output_dim)
+            inverseTransform = self.apply(enumeratedCoordinates, backward=1)        
+            pixel_grid = [np.arange(coordinates) for coordinates in data.shape]
+            inverseInterpolateArray = \
+                interpn(points=pixel_grid, values=data, method='linear', \
+                        xi=inverseTransform, bounds_error=False, fill_value=0)
+            output[:] = inverseInterpolateArray
         return output.transpose()
 
 
+    def __repr__(self):
+        outscript = "{}({}{!r}{}{!r}{}{!r}{}{!r}{}{!r}{}{!r}{}{!r}{}{!r})".format(
+            self.__class__.__name__,
+            'parameters=',self.parameters,
+            ', reverse_flag=',self.reverse_flag,
+            ', input_coord=',self.input_coord,
+            ', input_unit=',self.input_unit,
+            ', output_coord=',self.output_coord,
+            ', output_unit=',self.output_unit,
+            ', input_dim=',self.input_dim,
+            ', output_dim=',self.output_dim)
+        return(outscript.replace('array', ''))
+
+
+    def __str__(self):
+        outscript = "{}{!s}{}{!r}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}".format(
+                "Transform name: ", self.name,
+                "\nInput parameters: ", self.parameters,
+                "\nNon-Invertible: ", self._non_invertible,
+                "\nInverse Matrix: \n", self.inverseMatrix,
+                "\nReverse Flag: ", self.reverse_flag,
+                "\nInput Coord: ", self.input_coord,
+                "\nOutput Coord: ", self.output_coord,
+                "\nInput Unit: ", self.input_unit,
+                "\nOutput Units: ", self.output_unit,
+                "\nInput Dim: ", self.input_dim,
+                "\nOutput Dim: ", self.output_dim)
+        #repr(obj).replace('array(', '')[:-1]
+        return outscript
 
 #    @abstractmethod
 #    def inputDataShape( self, data, backward = 0 ):
@@ -344,52 +396,74 @@ class t_linear(Transform):
            [8.70,  3.06,  8.]])
     """
 
-    def __init__(self, parameters, reverse_flag = None, name = 't_linear'):
+
+    def __init__(self, parameters, reverse_flag=None, name='t_linear',
+                 input_coord=None, output_coord=None, input_unit=None, 
+                 output_unit=None, input_dim=None, output_dim=None):
+
         super().__init__(name, parameters, reverse_flag=reverse_flag)
 
 
 #---allows for variable variable names
         if 'd' in self.parameters:
             self.parameters['dimensions'] = self.parameters['d']
+            del self.parameters['d']
         if 'dim' in self.parameters:
             self.parameters['dimensions'] = self.parameters['dim']
+            del self.parameters['dim']
         if 'dims' in self.parameters:
             self.parameters['dimensions'] = self.parameters['dims']
+            del self.parameters['dims']
         if 'Dims' in self.parameters:
             self.parameters['dimensions'] = self.parameters['Dims']
+            del self.parameters['Dims']
 
         if 'm' in self.parameters:
             self.parameters['matrix'] = self.parameters['m']
+            del self.parameters['m']
         if 'Matrix' in self.parameters:
             self.parameters['matrix'] = self.parameters['Matrix']
+            del self.parameters['Matrix']
 
         if 'post' in self.parameters:
             self.parameters['postoffset'] = self.parameters['post']
+            del self.parameters['post']
         if 'shift' in self.parameters:
             self.parameters['postoffset'] = self.parameters['shift']
+            del self.parameters['shift']
         if 'Shift' in self.parameters:
             self.parameters['postoffset'] = self.parameters['Shift']
+            del self.parameters['Shift']
 
         if 'pre' in self.parameters:
             self.parameters['preoffset'] = self.parameters['pre']
+            del self.parameters['pre']
         if 'offset' in self.parameters:
             self.parameters['preoffset'] = self.parameters['offset']
+            del self.parameters['offset']
         if 'Offset' in self.parameters:
             self.parameters['preoffset'] = self.parameters['Offset']
+            del self.parameters['Offset']
 
         if 'r' in self.parameters:
             self.parameters['rotation'] = self.parameters['r']
+            del self.parameters['r']
         if 'rot' in self.parameters:
             self.parameters['rotation'] = self.parameters['rot']
+            del self.parameters['rot']
         if 'rota' in self.parameters:
             self.parameters['rotation'] = self.parameters['rota']
+            del self.parameters['rota']
         if 'Rotation' in self.parameters:
             self.parameters['rotation'] = self.parameters['Rotation']
+            del self.parameters['Rotation']
 
         if 's' in self.parameters:
             self.parameters['scale'] = self.parameters['s']
+            del self.parameters['s']
         if 'Scale' in self.parameters:
             self.parameters['scale'] = self.parameters['Scale']
+            del self.parameters['Scale']
 
 #---add key parameters if not present and makes them 'None'. It
 #   also parses python arrays into numpy arrays if required. It checks for 
@@ -429,7 +503,6 @@ class t_linear(Transform):
 
             if self.parameters['scale'].ndim > 2:
                 raise ValueError("transform: t_linear: scale: Scale only accepts scalars and 1D arrays")
-
 
         if not 'preoffset' in self.parameters:
             self.parameters['preoffset'] = None
@@ -554,6 +627,27 @@ class t_linear(Transform):
                 for j in range(self.parameters['matrix'].shape[0]):
                     self.parameters['matrix'][j] *= \
                     self.parameters['scale'][j]
+    
+#---Check if array is invertable and set flag.
+        self = self.invertibleMatrixTest()
+
+    def invertibleMatrixTest(self):
+        """ Test if a matrix is invertible
+        Check to see if a given array is invertable and set flag. Compute the 
+        (multiplicative) inverse of the matrix (np.linalg.inv), if not, flag.
+
+        Parameters
+        ----------
+        data : np.array
+            array to be transformed
+        """
+
+        try:
+            self.inverseMatrix = np.linalg.inv(self.parameters['matrix'])
+        except np.linalg.LinAlgError:
+            self.inverseMatrix = None
+            self._non_invertible = 1
+        return self
 
 
 #===Calculate the inverse transform if possible
@@ -574,15 +668,8 @@ class t_linear(Transform):
         transform: t_linear: reversetransform: trying to invert a non-invertible matrix.
         """
 
-#---need to check if array is invertable and set flag. Compute the 
-#   (multiplicative) inverse of the matrix (np.linalg.inv), if not, flag.
-        self._non_invertible = 0
-        try:
-            self.inverseMatrix = np.linalg.inv(self.parameters['matrix'])
-        except np.linalg.LinAlgError:
-            self.inverseMatrix = None
-            self._non_invertible = 1
-
+#---Check if array is invertable and set flag.
+        self = self.invertibleMatrixTest()
 
         if not self._non_invertible:
 
@@ -624,6 +711,13 @@ class t_linear(Transform):
         The transforms are applied in this order:
             outdata = (data + pre) * transform + post
 
+        The method checks if the array is invertable and sets the appropriate 
+        flag. It tests to see if the array dimensions are sufficient for the 
+        proposed transform. Creates a copy of the data array and then adds the 
+        pre transform offset if specified. The output array is matrix multiplied 
+        by the specified transform and then post transform offsets are applied 
+        if specified.
+
         Parameters
         ----------
         data : np.array
@@ -635,15 +729,14 @@ class t_linear(Transform):
             automatically set to 0.
         """
 
-#---Test for reversible flags
+
+        self = self.invertibleMatrixTest()
+
         if (not backward and not self.reverse_flag) or \
            (backward and self.reverse_flag):
 
-#---Test to see if the array dimensions are sufficient for the proposed transform
             matrixDimension = self.parameters['matrix'].shape[0]
 
-#---Create a deep copy of the data array and add the pre transform offset if 
-#   specified. Read out the resulting array
             if self.parameters['preoffset'] is not None:
                 dataWithPreTransform = \
                   copy.copy(data[..., 0:matrixDimension]) + \
@@ -655,7 +748,6 @@ class t_linear(Transform):
 
             outdata = dataWithPreTransform
 
-#---Perform matrix multipliction and add post transform offset if specified.
             if self.parameters['postoffset'] is not None:
                 outdata[..., 0:matrixDimension] = \
                 np.matmul(dataWithPreTransform, self.parameters['matrix']) + \
@@ -669,25 +761,67 @@ class t_linear(Transform):
         else:
             return self.reversetransform( data )
 
+    def __repr__(self): 
+        if (self.parameters['rotation'] is not None) :
+            self.parameters['matrix'] = None
+        if (self.parameters['scale'] is not None) :
+            self.parameters['matrix'] = None
+        output_repr = super().__repr__()
+
+        return output_repr
+
+    def __str__(self): 
+        PreserveParameters = copy.copy(self.parameters)
+        self.parameters = None
+        output_str = super().__str__()
+
+        output_str = "{}{!s}{}{!s}{}{!s}{}{!s}{}{!s}{}{!s}{}{!s}".format(
+                output_str,
+                "\nParameters: ",
+                "\n - scale: ", PreserveParameters['scale'],
+                "\n - rotation: ", PreserveParameters['rotation'],
+                "\n - matrix: \n", PreserveParameters['matrix'],
+                "\n - preoffset: ", PreserveParameters['preoffset'],
+                "\n - postoffset: ", PreserveParameters['postoffset'],
+                "\n - dimensions: ", PreserveParameters['dimensions'])
+        output_str = output_str.replace("Input parameters: None", "")
+        
+        self.parameters = copy.copy(PreserveParameters)
+        del PreserveParameters
+
+        return output_str
+
+   
+
+
+# f(g(h(x))) == composition([h, g, f]) or composition([f, g, h])
+# look at function composition in python to find standard but it seems like second is more common.
+class t_compose(Transform):
+    def __init__(self, t_list, parameters=None, reverse_flag=None):
+
+#---This bit creates the name.
+        self.func_list = []
+        compose_name = ""
+        for tform in t_list:
+            if type(tform) is t_compose:
+                self.func_list.extend(tform.func_list)
+                compose_name += tform.name
+            else:
+                self.func_list.append(tform)
+                if tform.reverse_flag == 1:
+                    compose_name += f" x {tform.name} inverse"
+                else:
+                    compose_name += f" x {tform.name}"
+        super().__init__(name=compose_name, input_coord=input_coord, input_unit=input_unit, output_coord=output_coord,
+                         output_unit=output_unit, parameters=parameters, reverse_flag=reverse_flag, input_dim=input_dim,
+                         output_dim=output_dim)
+
+
+#PErl code composition
+#A way to represent the transform so it's representable to person. this uses stringify. We also want to 
+#each subclass neeeds to urn itseldf intot a similar string.
+#in super class it reads name and forward/iverse flag
+# read forward and inverse out
 
     def __str__(self):
-        outString = f"Transform name: {self.name}\n"\
-                    f"Input parameters: {self.parameters}\n"\
-                    f"Non-Invertible: {self._non_invertible}\n"\
-                    f"Inverse Matrix: {self.inverseMatrix}\n"\
-                    f"matrix:{self.parameters['matrix']}\n"\
-                    f"scale:{self.parameters['scale']}\n"\
-                    f"rot: "f"{self.parameters['rot']}\n"\
-                    f"pre: {self.parameters['pre']}\n"\
-                    f"post: {self.parameters['post']}\n"\
-                    f"dims: {self.parameters['dims']}\n"\
-                    f"Reverse Flag: {self.reverse_flag}\n"\
-                    f"Non-Invertible: {self._non_invertible}"
-                    #f"Input Coord: {self.input_coord}\n"
-                    #f"Input Unit:{self.input_unit}\n"
-                    #f"Output Coord: {self.output_coord}\n"
-                    #f"Output Units: {self.output_unit}\n"
-                    #f"Input Dim: {self.input_dim}\n"
-                    #f"Output Dim: {self.output_dim}"
-        return outString 
-
+        outString = f"Transform name: {self.name}\n"
