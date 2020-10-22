@@ -16,64 +16,6 @@ __status__ = "Production"
 
 
 
-
-def ndcoords(*dims):
-    """Returns an enumerated list of coordinates for given dimensions
-
-    Returns an enumerated list of coordinates for given dimensions, initizilzed 
-    to a tuple, adding an extra dim on the front to accommodate
-    the vector coordinate index
-
-    Parameters
-    ----------
-    *dims : tuple, list or numpy array dimensions of the input array
-
-    Returns
-    -------
-    array(float64)
-
-    Usage
-    ----- 
-    $indices = ndcoords($tuple)
-    $indices = ndcoords($list)
-    $indices = ndcoords(np.ndarray())
-
-    Notes
-    -----
-    Enumerate pixel coordinates for an N-D variable, you feed
-    in a dimension list and get out a piddle whose 0th dimension runs over
-    dimension index and whose 1st through Nth dimensions are the
-    dimensions given in the input.  If you feed in a piddle instead of a
-    perl list.
-
-    Examples
-    --------
-    >>> print(ndcoords([3,2]))
-    >>> [[[0. 0.]
-    >>>   [1. 0.]
-    >>>   [2. 0.]]
-    >>> 
-    >>>  [[0. 1.]
-    >>>   [1. 1.]
-    >>>   [2. 1.]]]
-    """
-
-    grid_size = []
-    if type(dims[0]) is tuple \
-    or type(dims[0]) is list \
-    or type(dims[0]) is np.ndarray:
-        for i in range(len(dims[0])):
-            grid_size.append(range(dims[0][i]))
-    else:
-        for i in range(len(dims)):
-            grid_size.append(range(dims[i]))
-
-    out = np.mgrid[grid_size]
-
-    out = out.astype('float64').transpose()
-    return out
-
-
 class Transform(ABC):
     def __init__(self, name, parameters, reverse_flag, input_coord=None, 
         input_unit=None, output_coord=None, output_unit=None, input_dim=None,
@@ -88,6 +30,11 @@ class Transform(ABC):
         :type output_unit: astropy.units
         :type input_dim: int
         :type output_dim: int
+
+        image_data = Input Image
+        testmap = transform.t_linear(parameters = {'rot':30})
+        map_out = testmap.map(data=image_data)
+        
         """
         self.name = name
         self.parameters = parameters
@@ -183,15 +130,20 @@ class Transform(ABC):
         Raises
         ------
         """
-
+#Note we're looking at a TRANSFORM map rather than an IMAGE map. In this the tranforms are the objects and Map is a verb
+# in D. Zarro, Map is noun
         if template is not None:
             self.output_dim = template
         else:
             self.output_dim = data.shape
             output = np.empty(shape=self.output_dim, dtype=np.float64)
             output_dim = output.shape
-            enumeratedCoordinates = ndcoords(output_dim)
-            inverseTransform = self.apply(enumeratedCoordinates, backward=1)        
+
+            grid_size = []
+            for i in range(len(output_dim)):
+                grid_size.append(range(output_dim[i]))
+            enumeratedCoordinates = np.mgrid[grid_size].astype('float64').transpose()
+            inverseTransform = self.apply(enumeratedCoordinates, backward=1)
             pixel_grid = [np.arange(coordinates) for coordinates in data.shape]
             inverseInterpolateArray = \
                 interpn(points=pixel_grid, values=data, method='linear', \
@@ -544,7 +496,6 @@ class t_linear(Transform):
             self.output_dim = self.parameters['matrix'].shape[1]
             if (self.parameters['matrix'].shape[1] != \
                 self.parameters['matrix'].shape[0]):
-                
                 raise ValueError("transform: t_linear: matrix: expects a square input matrix. Stopping here")
         else:
             if self.parameters['rotation'] is not None and \
@@ -787,34 +738,81 @@ class t_linear(Transform):
         output_str = output_str.replace("Input parameters: None", "")
         
         self.parameters = copy.copy(PreserveParameters)
-        del PreserveParameters
+        #del PreserveParameters
 
         return output_str
 
-   
 
 
+# can we overlay operators in python??
+# tranform_list=[h,g,f]
 # f(g(h(x))) == composition([h, g, f]) or composition([f, g, h])
 # look at function composition in python to find standard but it seems like second is more common.
+# if composite is handed to composite then lists get combined. Look at object type. 
 class t_compose(Transform):
-    def __init__(self, t_list, parameters=None, reverse_flag=None):
+    def __init__(self, transform_list, parameters=None, reverse_flag=None):
 
 #---This bit creates the name.
-        self.func_list = []
+        self.function_list = transform_list
+        print("In 1")        
         compose_name = ""
-        for tform in t_list:
-            if type(tform) is t_compose:
-                self.func_list.extend(tform.func_list)
-                compose_name += tform.name
-            else:
-                self.func_list.append(tform)
-                if tform.reverse_flag == 1:
-                    compose_name += f" x {tform.name} inverse"
-                else:
-                    compose_name += f" x {tform.name}"
-        super().__init__(name=compose_name, input_coord=input_coord, input_unit=input_unit, output_coord=output_coord,
-                         output_unit=output_unit, parameters=parameters, reverse_flag=reverse_flag, input_dim=input_dim,
-                         output_dim=output_dim)
+        
+        for singleTransform in self.function_list:
+            print(repr(testmap))
+            compose_name += f" o {singleTransform.name}"
+            for parameter in singleTransform.parameters:
+                if parameter:
+                    if ( parameter is not None):
+                        #print(parameter)
+                        pass
+            for key in singleTransform.parameters:
+                if singleTransform.parameters[key] is not None:
+                    print(key, '->', singleTransform.parameters[key])
+        
+
+#---This checks if object is already a t_compose and injests the functions
+#            if type(tform) is t_compose:
+#                self.func_list.extend(tform.func_list)
+#                compose_name += tform.name
+
+#---This takes the names of the current list and adds them together.
+#            else:
+#                self.func_list.append(tform)
+#                if tform.reverse_flag == 1:
+#                    compose_name += f" x {tform.name} inverse"
+#                else:
+#                    compose_name += f" x {tform.name}"
+        print("In 1")
+        print(type(singleTransform.parameters))
+        print(compose_name)
+
+        super().__init__(name=compose_name, parameters=parameters, reverse_flag=reverse_flag, input_coord=None, input_unit=None, output_coord=None,
+                         output_unit=None, input_dim=None, output_dim=None)
+        pass
+
+#Look in numpy book for the order of dimensionality. 
+
+
+
+
+#1. Remove ndcoords
+#2. finish composition
+#3. Clean up arc, make sure still passes the tests
+#4. Look at order of dims 
+
+
+
+
+
+#what does super init do?
+
+#create while loop for t_list
+
+
+
+# this needs to perform multiple transforms
+# this needs to create a record in repr
+# needs to create a written record of what it has done
 
 
 #PErl code composition
@@ -822,6 +820,9 @@ class t_compose(Transform):
 #each subclass neeeds to urn itseldf intot a similar string.
 #in super class it reads name and forward/iverse flag
 # read forward and inverse out
+
+
+
 
     def __str__(self):
         outString = f"Transform name: {self.name}\n"
