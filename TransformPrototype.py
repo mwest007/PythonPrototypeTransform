@@ -4,6 +4,7 @@ from scipy.interpolate import interpn
 import numpy as np
 import copy
 import reprlib
+import warnings
 
 __author__ = "Matthew J West, Craig DeForest, Jake-R-W"
 __copyright__ = "By all the listed autors: GPLv2, There is no warranty."
@@ -17,9 +18,12 @@ __status__ = "Production"
 
 
 class Transform(ABC):
-    def __init__(self, name, parameters, reverse_flag, input_coord=None, 
+    def __init__(self, name, parameters, reverse_flag=None, input_coord=None, 
         input_unit=None, output_coord=None, output_unit=None, input_dim=None,
         output_dim=None):
+
+
+
         """
         :type name: str
         :type parameters: dict
@@ -36,6 +40,11 @@ class Transform(ABC):
         map_out = testmap.map(data=image_data)
         
         """
+        if (reverse_flag is None): 
+            reverse_flag = 0
+            warnings.warn("transform: a reverse_flag was not specified, assuming forward transform reverse_flag=0")
+
+
         self.name = name
         self.parameters = parameters
         self.reverse_flag = reverse_flag
@@ -46,6 +55,23 @@ class Transform(ABC):
         self.input_dim = input_dim
         self.output_dim = output_dim
         self._non_invertible = 0
+
+    def invertibleMatrixTest(self):
+        """ Test if a matrix is invertible
+        Check to see if a given array is invertable and set flag. Compute the 
+        (multiplicative) inverse of the matrix (np.linalg.inv), if not, flag.
+
+        Parameters
+        ----------
+        data : np.array
+            array to be transformed
+        """
+        try:
+            self.inverseMatrix = np.linalg.inv(self.parameters['matrix'])
+        except np.linalg.LinAlgError:
+            self.inverseMatrix = None
+            self._non_invertible = 1
+        return self
 
 
     def apply(self, data, backward = 0, paddedmatrix = 1):
@@ -353,69 +379,29 @@ class t_linear(Transform):
                  input_coord=None, output_coord=None, input_unit=None, 
                  output_unit=None, input_dim=None, output_dim=None):
 
-        super().__init__(name, parameters, reverse_flag=reverse_flag)
-
+        super().__init__(name, parameters, reverse_flag=reverse_flag, input_coord=input_coord,
+            input_unit=input_unit, output_coord=output_coord, output_unit=output_unit, input_dim=input_dim, output_dim=output_dim)
 
 #---allows for variable variable names
-        if 'd' in self.parameters:
-            self.parameters['dimensions'] = self.parameters['d']
-            del self.parameters['d']
-        if 'dim' in self.parameters:
-            self.parameters['dimensions'] = self.parameters['dim']
-            del self.parameters['dim']
         if 'dims' in self.parameters:
             self.parameters['dimensions'] = self.parameters['dims']
             del self.parameters['dims']
-        if 'Dims' in self.parameters:
-            self.parameters['dimensions'] = self.parameters['Dims']
-            del self.parameters['Dims']
-
-        if 'm' in self.parameters:
-            self.parameters['matrix'] = self.parameters['m']
-            del self.parameters['m']
-        if 'Matrix' in self.parameters:
-            self.parameters['matrix'] = self.parameters['Matrix']
-            del self.parameters['Matrix']
 
         if 'post' in self.parameters:
             self.parameters['postoffset'] = self.parameters['post']
             del self.parameters['post']
-        if 'shift' in self.parameters:
-            self.parameters['postoffset'] = self.parameters['shift']
-            del self.parameters['shift']
-        if 'Shift' in self.parameters:
-            self.parameters['postoffset'] = self.parameters['Shift']
-            del self.parameters['Shift']
 
         if 'pre' in self.parameters:
             self.parameters['preoffset'] = self.parameters['pre']
             del self.parameters['pre']
-        if 'offset' in self.parameters:
-            self.parameters['preoffset'] = self.parameters['offset']
-            del self.parameters['offset']
-        if 'Offset' in self.parameters:
-            self.parameters['preoffset'] = self.parameters['Offset']
-            del self.parameters['Offset']
 
-        if 'r' in self.parameters:
-            self.parameters['rotation'] = self.parameters['r']
-            del self.parameters['r']
         if 'rot' in self.parameters:
             self.parameters['rotation'] = self.parameters['rot']
             del self.parameters['rot']
-        if 'rota' in self.parameters:
-            self.parameters['rotation'] = self.parameters['rota']
-            del self.parameters['rota']
-        if 'Rotation' in self.parameters:
-            self.parameters['rotation'] = self.parameters['Rotation']
-            del self.parameters['Rotation']
 
         if 's' in self.parameters:
             self.parameters['scale'] = self.parameters['s']
             del self.parameters['s']
-        if 'Scale' in self.parameters:
-            self.parameters['scale'] = self.parameters['Scale']
-            del self.parameters['Scale']
 
 #---add key parameters if not present and makes them 'None'. It
 #   also parses python arrays into numpy arrays if required. It checks for 
@@ -582,25 +568,6 @@ class t_linear(Transform):
 #---Check if array is invertable and set flag.
         self = self.invertibleMatrixTest()
 
-    def invertibleMatrixTest(self):
-        """ Test if a matrix is invertible
-        Check to see if a given array is invertable and set flag. Compute the 
-        (multiplicative) inverse of the matrix (np.linalg.inv), if not, flag.
-
-        Parameters
-        ----------
-        data : np.array
-            array to be transformed
-        """
-
-        try:
-            self.inverseMatrix = np.linalg.inv(self.parameters['matrix'])
-        except np.linalg.LinAlgError:
-            self.inverseMatrix = None
-            self._non_invertible = 1
-        return self
-
-
 #===Calculate the inverse transform if possible
     def reversetransform(self, data):
 
@@ -738,7 +705,6 @@ class t_linear(Transform):
         output_str = output_str.replace("Input parameters: None", "")
         
         self.parameters = copy.copy(PreserveParameters)
-        #del PreserveParameters
 
         return output_str
 
@@ -750,52 +716,109 @@ class t_linear(Transform):
 # look at function composition in python to find standard but it seems like second is more common.
 # if composite is handed to composite then lists get combined. Look at object type. 
 class t_compose(Transform):
-    def __init__(self, transform_list, parameters=None, reverse_flag=None):
+    def __init__(self, transform_list, input_coord=None, input_unit=None, output_coord=None, output_unit=None,
+                 parameters=None, reverse_flag=0, input_dim=None, output_dim=None):
+
+#    def __init__(self, parameters, reverse_flag=None, name='t_linear',
+#                 input_coord=None, output_coord=None, input_unit=None, 
+#                 output_unit=None, input_dim=None, output_dim=None):
 
 #---This bit creates the name.
-        self.function_list = transform_list
-        print("In 1")        
+        self.function_list = []#transform_list
+        self.inverseMatrix=None
         compose_name = ""
         
-        for singleTransform in self.function_list:
-            print(repr(testmap))
-            compose_name += f" o {singleTransform.name}"
-            for parameter in singleTransform.parameters:
-                if parameter:
-                    if ( parameter is not None):
-                        #print(parameter)
-                        pass
-            for key in singleTransform.parameters:
-                if singleTransform.parameters[key] is not None:
-                    print(key, '->', singleTransform.parameters[key])
-        
+        for singleTransform in transform_list:
 
-#---This checks if object is already a t_compose and injests the functions
-#            if type(tform) is t_compose:
-#                self.func_list.extend(tform.func_list)
-#                compose_name += tform.name
-
-#---This takes the names of the current list and adds them together.
-#            else:
-#                self.func_list.append(tform)
-#                if tform.reverse_flag == 1:
-#                    compose_name += f" x {tform.name} inverse"
-#                else:
-#                    compose_name += f" x {tform.name}"
-        print("In 1")
-        print(type(singleTransform.parameters))
-        print(compose_name)
+            if type(singleTransform) is t_compose:
+                self.function_list.extend(singleTransform.function_list)
+                compose_name += singleTransform.name
+            else:
+                self.function_list.append(singleTransform)
+                if singleTransform.reverse_flag == 1:
+                    compose_name += f" o {singleTransform.name} inverse"
+                else:
+                    compose_name += f" o {singleTransform.name}"
+        compose_name = compose_name[3:]
 
         super().__init__(name=compose_name, parameters=parameters, reverse_flag=reverse_flag, input_coord=None, input_unit=None, output_coord=None,
                          output_unit=None, input_dim=None, output_dim=None)
-        pass
 
+        #self = self.invertibleMatrixTest()
+        print(transform_list[0].parameters)
+    def forwardtransform(self, data, backward):
+        print("In HERE")
+#---Check if array is invertable and set flag.
+        self = self.invertibleMatrixTest()
+
+        out_data = copy.deepcopy(data)
+        if backward:
+            for singleTransform in reversed(self.function_list):
+                out_data = singleTransform.apply(out_data, backward=1)
+        else:
+            for singleTransform in reversed(self.function_list):
+                out_data = singleTransform.apply(out_data)
+
+        return out_data
+
+
+        #output4 = testmap3.apply(testmap2.apply(testmap1.apply(TestArray)))
+
+
+ #---Make the input parameters the current parameters
+        #self.name=inputname
+        #self.parameters=inputparameters
+        #self._non_invertible=None
+        
+        #self.reverse_flag=None
+        #self.input_coord=None
+        #self.output_coord=None
+        #self.input_unit=None
+        #self.output_unit=None
+        #self.input_dim=None
+        #self.output_dim=None
+#---apply them following the repr example
+
+#---appply map each time    
+
+#---make out put a hash of name, parameters etc.    
+
+
+
+
+
+        
+    #print(self.inverseMatrix)
+
+#intermediate_data1 = self.t_lin.apply(self.data)
+
+
+
+    def __str__(self):
+        PreserveParameters = copy.copy(self.parameters)
+        #self.parameters = None
+        output_str = super().__str__()
+
+        output_str = "{}{!s}{}{!s}{}{!s}{}{!s}{}{!s}{}{!s}{}{!s}".format(
+                output_str,
+                "\nParameters: ",
+                "\n - scale: ", PreserveParameters['scale'],
+                "\n - rotation: ", PreserveParameters['rotation'],
+                "\n - matrix: \n", PreserveParameters['matrix'],
+                "\n - preoffset: ", PreserveParameters['preoffset'],
+                "\n - postoffset: ", PreserveParameters['postoffset'],
+                "\n - dimensions: ", PreserveParameters['dimensions'])
+        output_str = output_str.replace("Input parameters: None", "")
+        
+        self.parameters = copy.copy(PreserveParameters)
+
+        return output_str
 #Look in numpy book for the order of dimensionality. 
+#    def __repr__(self):
 
 
 
-
-#1. Remove ndcoords
+#1. Remove ndcoords - Done
 #2. finish composition
 #3. Clean up arc, make sure still passes the tests
 #4. Look at order of dims 
@@ -820,9 +843,7 @@ class t_compose(Transform):
 #each subclass neeeds to urn itseldf intot a similar string.
 #in super class it reads name and forward/iverse flag
 # read forward and inverse out
+#use mgrid and broadcast in different directions
 
 
 
-
-    def __str__(self):
-        outString = f"Transform name: {self.name}\n"
