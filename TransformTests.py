@@ -45,10 +45,7 @@ class test_t_linear(unittest.TestCase):
         TestArray = TestArray_5x5NumpyArray
         ScalarScale = np.array([3])
         FunctionParams = {'matrix': None, 'rot': None, 'scale': ScalarScale, 'pre': None, 'post': None, 'dims': None}
-
         test_object = transform.t_linear( parameters = FunctionParams  )
-
-
         
         #---Outputs
         output = test_object.apply(TestArray, paddedmatrix=0)
@@ -372,7 +369,6 @@ class test_t_linear(unittest.TestCase):
 
         #---Outputs
         output = test_object.apply( TestArray , backward=1)
-
         expected_output = np.array([[-0.5 ,  0.87,  2.  ], \
                                     [ 0.6 ,  4.96,  5.  ], \
                                     [ 1.7 ,  9.06,  8.  ]])
@@ -402,23 +398,6 @@ class test_t_linear(unittest.TestCase):
         self.assertEqual( numpytest, None, "Should be None") 
  
 
-
-    def test_ndcoords_3(self):
-        print("\nTesting :", self)
-
-        #---Inputs
-        TestArray = (3)
-
-        #---Outputs
-        output = transform.ndcoords( TestArray )
-
-        expected_output = np.array([[ 0.0 ], \
-                                    [ 1.0 ], \
-                                    [ 2.0 ]])
-        
-        #---Tests
-        numpytest = np.testing.assert_array_equal( output , expected_output )
-        self.assertEqual( numpytest, None, "Should be None")
 
 
     def test_t_linear_r30_padded_reverse_flag(self):
@@ -506,8 +485,7 @@ class test_t_linear(unittest.TestCase):
 
         #---Outputs
         output = repr(test_object)
-        expected_output = "t_linear(parameters={'scale': ([5, 5]), 'rotation': (30), 'matrix': None, 'preoffset': None, 'postoffset': None, 'dimensions': None}, reverse_flag=None, input_coord=None, input_unit=None, output_coord=None, output_unit=None, input_dim=2, output_dim=2)"
-
+        expected_output = "t_linear(parameters={'scale': ([5, 5]), 'rotation': (30), 'matrix': None, 'preoffset': None, 'postoffset': None, 'dimensions': None}, reverse_flag=0, input_coord=None, input_unit=None, output_coord=None, output_unit=None, input_dim=2, output_dim=2)"
         #---Tests
         self.assertEqual( output, expected_output, "Should be resuable repr string") 
 
@@ -521,7 +499,7 @@ class test_t_linear(unittest.TestCase):
 
         #---Outputs
         output = repr(test_object)
-        expected_output = "t_linear(parameters={'rotation': (30), 'matrix': None, 'scale': None, 'preoffset': None, 'postoffset': None, 'dimensions': None}, reverse_flag=None, input_coord=None, input_unit=None, output_coord=None, output_unit=None, input_dim=2, output_dim=2)"
+        expected_output = "t_linear(parameters={'rotation': (30), 'matrix': None, 'scale': None, 'preoffset': None, 'postoffset': None, 'dimensions': None}, reverse_flag=0, input_coord=None, input_unit=None, output_coord=None, output_unit=None, input_dim=2, output_dim=2)"
 
         #---Tests
         self.assertEqual( output, expected_output, "Should be resuable repr string") 
@@ -538,14 +516,53 @@ class test_t_linear(unittest.TestCase):
 
         #---Outputs
         output = repr(test_object)
-        expected_output = "t_linear(parameters={'scale': ([5, 5]), 'matrix': None, 'rotation': None, 'preoffset': None, 'postoffset': None, 'dimensions': None}, reverse_flag=None, input_coord=None, input_unit=None, output_coord=None, output_unit=None, input_dim=2, output_dim=2)"
+        expected_output = "t_linear(parameters={'scale': ([5, 5]), 'matrix': None, 'rotation': None, 'preoffset': None, 'postoffset': None, 'dimensions': None}, reverse_flag=0, input_coord=None, input_unit=None, output_coord=None, output_unit=None, input_dim=2, output_dim=2)"
 
         #---Tests
         self.assertEqual( output, expected_output, "Should be resuable repr string") 
 
+    def test_t_linear_r30_map(self):
+        print("\nTesting :", self)
 
+        #---Inputs
+        image_data = TestArray_fits
+        TestRot=90
+        TestRot2=-90
+        pre = np.array([-512,-512])
+        post = np.array([512,512])
+        testmap = transform.t_linear(parameters = {'rot':TestRot, 'pre':pre, 'post':post})
+        map_out = testmap.map(data=image_data)
+        testmap = transform.t_linear(parameters = {'rot':TestRot2, 'pre':pre, 'post':post})
+        output = testmap.map(data=map_out)
 
+        #---Outputs
+        expected_output = TestArray_fits
+        
+        #---Tests - note at edges of the images information is lost, so they're cut off
+        xStart = 250
+        yStart = xStart
+        xEnd = 750
+        yEnd = xEnd
+        numpytest = np.testing.assert_almost_equal( output[xStart:xEnd,yStart:yEnd] , expected_output[xStart:xEnd,yStart:yEnd], decimal=3 )
+        self.assertEqual( numpytest, None, "Should be None") 
+  
 
+    def test_compose_text(self):
+        print("\nTesting :", self)
+
+        #---Inputs
+        transform1 = transform.t_linear(parameters = {'scale':30})
+        transform2 = transform.t_linear(parameters = {'scale':0.066666})
+        transform3 = transform.t_linear(parameters = {'scale':0.5})
+        transformList = [transform1, transform2, transform3]
+        test_object = transform.t_compose(transformList)
+        #---Outputs
+        output = test_object.apply(TestArray_5x5NumpyArray)
+        expected_output = transform3.apply(transform2.apply(transform1.apply(TestArray_5x5NumpyArray)))
+        
+        #---Tests - note at edges of the images information is lost, so they're cut off
+        numpytest = np.testing.assert_almost_equal( output , expected_output, decimal=3 )
+        self.assertEqual( numpytest, None, "Should be None") 
 
 
 def run_specific_tests():
