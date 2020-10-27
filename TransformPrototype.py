@@ -18,7 +18,7 @@ __status__ = "Production"
 
 
 class Transform(ABC):
-    def __init__(self, name, parameters, reverse_flag=None, input_coord=None, 
+    def __init__(self, name, parameters, reverse_flag, input_coord=None, 
         input_unit=None, output_coord=None, output_unit=None, input_dim=None,
         output_dim=None):
 
@@ -74,7 +74,24 @@ class Transform(ABC):
         return self
 
 
-    def apply(self, data, backward = 0, paddedmatrix = 1):
+    def padMatrix(self, outdata, data, paddedmatrix=1):
+        """
+        Pads the output data so it matches the input data, if padded_matrix and 
+        outdata.shape[0] < output_dim OR check if output_dim == input_dim
+        """
+        outdata = copy.copy(outdata)
+        if paddedmatrix :
+            if outdata.ndim > 1:
+                if outdata.shape[1] < data.shape[1]:
+                    if outdata.shape[0] > data.shape[0]:
+                        raise ValueError(f"transform: Cannot pad data to match input dimensions")
+                    paddeddata = data
+                    paddeddata[0:outdata.shape[0], 0:outdata.shape[1]] = outdata
+                    outdata = paddeddata
+
+        return outdata
+   
+    def apply(self, data, backward=0, paddedmatrix=1):
         """apply the transform for given parameters to the input array (data). 
         
         Parameters
@@ -97,26 +114,21 @@ class Transform(ABC):
         transform: t_linear: apply: Cannot pad data to match input dimensions
         """
 
+
         data = copy.copy(data)
         matrixDimension = self.parameters['matrix'].shape[0]
         if matrixDimension > np.shape(data)[-1]:
             raise ValueError(f"transform: t_linear: invert: transform requires at least a {np.shape(data)[-1]}  dimension columns array ")
 
 #---Perform the transform
-        outdata = self.forwardtransform(data, backward)
 
-#---Pads the output data so it matches the input data, if padded_matrix and 
-#   outdata.shape[0] < output_dim OR check if output_dim == input_dim
-        if paddedmatrix :
-            if outdata.ndim > 1:
-                if outdata.shape[1] < data.shape[1]:
-                    if outdata.shape[0] > data.shape[0]:
-                        raise ValueError(f"transform: t_linear: apply: Cannot pad data to match input dimensions")
-                    paddeddata = data
-                    paddeddata[0:outdata.shape[0], 0:outdata.shape[1]] = outdata
-                    outdata = paddeddata
+        self = self.invertibleMatrixTest()
+        outdata = self.forwardtransform(data, backward)
+        outdata = self.padMatrix(outdata, data, paddedmatrix)
 
         return outdata
+
+
 
 
     def map(self, data=None, template=None, opts=None):
@@ -146,6 +158,8 @@ class Transform(ABC):
           extrapolated. Extrapolation is not supported by method “splinef2d”.
         8. Take the transpose
         
+        Note we're looking at a TRANSFORM map rather than an IMAGE map. In this the tranforms are the objects and Map is a verb, in D. Zarro, Map is noun
+        
         Parameters
         ----------
         data : np.array
@@ -156,8 +170,7 @@ class Transform(ABC):
         Raises
         ------
         """
-#Note we're looking at a TRANSFORM map rather than an IMAGE map. In this the tranforms are the objects and Map is a verb
-# in D. Zarro, Map is noun
+
         if template is not None:
             self.output_dim = template
         else:
@@ -207,11 +220,6 @@ class Transform(ABC):
                 "\nOutput Dim: ", self.output_dim)
         #repr(obj).replace('array(', '')[:-1]
         return outscript
-
-#    @abstractmethod
-#    def inputDataShape( self, data, backward = 0 ):
-#        pass
-
 
 
 
@@ -382,6 +390,7 @@ class t_linear(Transform):
         super().__init__(name, parameters, reverse_flag=reverse_flag, input_coord=input_coord,
             input_unit=input_unit, output_coord=output_coord, output_unit=output_unit, input_dim=input_dim, output_dim=output_dim)
 
+
 #---allows for variable variable names
         if 'dims' in self.parameters:
             self.parameters['dimensions'] = self.parameters['dims']
@@ -503,7 +512,7 @@ class t_linear(Transform):
                     self.input_dim = self.parameters['scale'].shape[0]
                     self.output_dim = self.parameters['scale'].shape[0]
                 else:
-                     print("transform: t_linear: scale: Scalar detected assuming 2-D tranform")
+                     warnings.warn("transform: t_linear: scale: Scalar detected assuming 2-D tranform")
                      self.parameters['scale'] = np.atleast_1d(np.array(self.parameters['scale']))
                      self.input_dim = 2
                      self.output_dim = 2                    
@@ -523,7 +532,7 @@ class t_linear(Transform):
                     self.output_dim = self.parameters['dimensions']
 
             else:
-                print("transform: t_linear: dims: Insufficient dimensions specified, assuming 2-D transform")
+                warnings.warn("transform: t_linear: dims: Insufficient dimensions specified, assuming 2-D transform")
                 self.input_dim = 2
                 self.output_dim = 2
 
@@ -566,7 +575,9 @@ class t_linear(Transform):
                     self.parameters['scale'][j]
     
 #---Check if array is invertable and set flag.
+
         self = self.invertibleMatrixTest()
+
 
 #===Calculate the inverse transform if possible
     def reversetransform(self, data):
@@ -623,8 +634,7 @@ class t_linear(Transform):
         else:
             raise ValueError("transform: t_linear: reversetransform: trying to invert a non-invertible matrix.")
 
-    def forwardtransform(self, data, backward):
-
+    def forwardtransform(self, data, backward=0, paddedmatrix=1):
         """apply the transform for given parameters to the input array (data). 
         The transforms are applied in this order:
             outdata = (data + pre) * transform + post
@@ -647,8 +657,12 @@ class t_linear(Transform):
             automatically set to 0.
         """
 
-
         self = self.invertibleMatrixTest()
+
+        matrixDimension = self.parameters['matrix'].shape[0]
+        if matrixDimension > np.shape(data)[-1]:
+            raise ValueError(f"transform: t_linear: invert: transform requires at least a {np.shape(data)[-1]}  dimension columns array ")
+
 
         if (not backward and not self.reverse_flag) or \
            (backward and self.reverse_flag):
@@ -719,13 +733,11 @@ class t_compose(Transform):
     def __init__(self, transform_list, input_coord=None, input_unit=None, output_coord=None, output_unit=None,
                  parameters=None, reverse_flag=0, input_dim=None, output_dim=None):
 
-#    def __init__(self, parameters, reverse_flag=None, name='t_linear',
-#                 input_coord=None, output_coord=None, input_unit=None, 
-#                 output_unit=None, input_dim=None, output_dim=None):
 
 #---This bit creates the name.
-        self.function_list = []#transform_list
+        self.function_list = []
         self.inverseMatrix=None
+
         compose_name = ""
         
         for singleTransform in transform_list:
@@ -744,14 +756,10 @@ class t_compose(Transform):
         super().__init__(name=compose_name, parameters=parameters, reverse_flag=reverse_flag, input_coord=None, input_unit=None, output_coord=None,
                          output_unit=None, input_dim=None, output_dim=None)
 
-        #self = self.invertibleMatrixTest()
-        print(transform_list[0].parameters)
-    def forwardtransform(self, data, backward):
-        print("In HERE")
-#---Check if array is invertable and set flag.
-        self = self.invertibleMatrixTest()
+    def apply(self, data, backward=0, paddedmatrix=1):
 
-        out_data = copy.deepcopy(data)
+#---Check if array is invertable and set flag.
+        out_data = copy.copy(data)
         if backward:
             for singleTransform in reversed(self.function_list):
                 out_data = singleTransform.apply(out_data, backward=1)
@@ -759,10 +767,9 @@ class t_compose(Transform):
             for singleTransform in reversed(self.function_list):
                 out_data = singleTransform.apply(out_data)
 
+        out_data = self.padMatrix(out_data, data, paddedmatrix)
+
         return out_data
-
-
-        #output4 = testmap3.apply(testmap2.apply(testmap1.apply(TestArray)))
 
 
  #---Make the input parameters the current parameters
@@ -784,19 +791,8 @@ class t_compose(Transform):
 #---make out put a hash of name, parameters etc.    
 
 
-
-
-
-        
-    #print(self.inverseMatrix)
-
-#intermediate_data1 = self.t_lin.apply(self.data)
-
-
-
     def __str__(self):
         PreserveParameters = copy.copy(self.parameters)
-        #self.parameters = None
         output_str = super().__str__()
 
         output_str = "{}{!s}{}{!s}{}{!s}{}{!s}{}{!s}{}{!s}{}{!s}".format(
