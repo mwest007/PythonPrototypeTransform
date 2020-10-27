@@ -722,20 +722,13 @@ class t_linear(Transform):
 
         return output_str
 
-
-
-# can we overlay operators in python??
-# tranform_list=[h,g,f]
-# f(g(h(x))) == composition([h, g, f]) or composition([f, g, h])
-# look at function composition in python to find standard but it seems like second is more common.
-# if composite is handed to composite then lists get combined. Look at object type. 
 class t_compose(Transform):
     def __init__(self, transform_list, input_coord=None, input_unit=None, output_coord=None, output_unit=None,
                  parameters=None, reverse_flag=0, input_dim=None, output_dim=None):
 
 
 #---This bit creates the name.
-        self.function_list = []
+        self.function_list=[]
         self.inverseMatrix=None
 
         compose_name = ""
@@ -768,71 +761,34 @@ class t_compose(Transform):
                 out_data = singleTransform.apply(out_data)
 
         out_data = self.padMatrix(out_data, data, paddedmatrix)
-
+        
         return out_data
 
 
- #---Make the input parameters the current parameters
-        #self.name=inputname
-        #self.parameters=inputparameters
-        #self._non_invertible=None
-        
-        #self.reverse_flag=None
-        #self.input_coord=None
-        #self.output_coord=None
-        #self.input_unit=None
-        #self.output_unit=None
-        #self.input_dim=None
-        #self.output_dim=None
+
+
+
 #---apply them following the repr example
-
 #---appply map each time    
-
 #---make out put a hash of name, parameters etc.    
 
 
-    def __str__(self):
-        PreserveParameters = copy.copy(self.parameters)
-        output_str = super().__str__()
 
-        output_str = "{}{!s}{}{!s}{}{!s}{}{!s}{}{!s}{}{!s}{}{!s}".format(
-                output_str,
-                "\nParameters: ",
-                "\n - scale: ", PreserveParameters['scale'],
-                "\n - rotation: ", PreserveParameters['rotation'],
-                "\n - matrix: \n", PreserveParameters['matrix'],
-                "\n - preoffset: ", PreserveParameters['preoffset'],
-                "\n - postoffset: ", PreserveParameters['postoffset'],
-                "\n - dimensions: ", PreserveParameters['dimensions'])
-        output_str = output_str.replace("Input parameters: None", "")
-        
-        self.parameters = copy.copy(PreserveParameters)
-
-        return output_str
 #Look in numpy book for the order of dimensionality. 
 #    def __repr__(self):
 
-
-
-#1. Remove ndcoords - Done
 #2. finish composition
 #3. Clean up arc, make sure still passes the tests
 #4. Look at order of dims 
-
-
-
 
 
 #what does super init do?
 
 #create while loop for t_list
 
-
-
 # this needs to perform multiple transforms
 # this needs to create a record in repr
 # needs to create a written record of what it has done
-
 
 #PErl code composition
 #A way to represent the transform so it's representable to person. this uses stringify. We also want to 
@@ -842,4 +798,9 @@ class t_compose(Transform):
 #use mgrid and broadcast in different directions
 
 
+# can we overlay operators in python??
+# tranform_list=[h,g,f]
+# f(g(h(x))) == composition([h, g, f]) or composition([f, g, h])
+# look at function composition in python to find standard but it seems like second is more common.
+# if composite is handed to composite then lists get combined. Look at object type. 
 
