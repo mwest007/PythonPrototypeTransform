@@ -547,7 +547,7 @@ class test_t_linear(unittest.TestCase):
         self.assertEqual( numpytest, None, "Should be None") 
   
 
-    def test_compose_text(self):
+    def test_compose(self):
         print("\nTesting :", self)
 
         #---Inputs
@@ -563,6 +563,196 @@ class test_t_linear(unittest.TestCase):
         #---Tests - note at edges of the images information is lost, so they're cut off
         numpytest = np.testing.assert_almost_equal( output , expected_output, decimal=3 )
         self.assertEqual( numpytest, None, "Should be None") 
+
+
+    def test_compose_inverse(self):
+        print("\nTesting :", self)
+
+        #---Inputs
+        transform1 = transform.t_linear(parameters = {'scale':30})
+        transform2 = transform.t_linear(parameters = {'scale':30}, reverse_flag=1)
+        transformList = [transform1, transform2]
+        test_object = transform.t_compose(transformList)
+        #---Outputs
+        output = test_object.apply(TestArray_5x5NumpyArray)
+        expected_output = transform2.apply(transform1.apply(TestArray_5x5NumpyArray))
+        
+        #---Tests - note at edges of the images information is lost, so they're cut off
+        numpytest = np.testing.assert_almost_equal( output , expected_output, decimal=1 )
+        self.assertEqual( numpytest, None, "Should be None") 
+
+
+    def test_compose_compose(self):
+        print("\nTesting :", self)
+
+        #---Inputs
+        transform1 = transform.t_linear(parameters = {'scale':30})
+        transform2 = transform.t_linear(parameters = {'scale':30}, reverse_flag=1)
+        transformList = [transform1, transform2]
+        transform3 = transform.t_compose(transformList)
+        transformList2 = [transform1, transform2, transform3]
+        test_object = transform.t_compose(transformList2)
+        #---Outputs
+        output = test_object.apply(TestArray_5x5NumpyArray)
+        expected_output = transform2.apply(transform1.apply(TestArray_5x5NumpyArray))
+        
+        #---Tests - note at edges of the images information is lost, so they're cut off
+        numpytest = np.testing.assert_almost_equal( output , expected_output, decimal=1 )
+        self.assertEqual( numpytest, None, "Should be None") 
+
+
+    def test_compose_order_1(self):
+        print("\nTesting :", self)
+
+        #---Inputs
+        transform1 = transform.t_linear(parameters = {'scale':1.0})
+        transform2 = transform.t_linear(parameters = {'scale':2.0})
+        transform3 = transform.t_linear(parameters = {'pre':5.0})
+        transformList = [transform1, transform2, transform3]
+        transformCompose = transform.t_compose(transformList)
+
+        #---Outputs
+        output = transformCompose.apply(TestArray_3x3NumpyArray)
+        expected_output = np.array([[   10,    12,    2], \
+                                    [   16,    18,    5], \
+                                    [   22,    24,    8]])
+        #---Tests - note at edges of the images information is lost, so they're cut off
+        numpytest = np.testing.assert_almost_equal( output , expected_output, decimal=1 )
+        self.assertEqual( numpytest, None, "Should be None") 
+
+
+    def test_compose_order_2(self):
+        print("\nTesting :", self)
+
+        #---Inputs
+        transform1 = transform.t_linear(parameters = {'scale':1.0})
+        transform2 = transform.t_linear(parameters = {'scale':4.0})
+        transform3 = transform.t_linear(parameters = {'pre':6.0})
+        transformList = [transform1, transform2, transform3]
+        transformCompose = transform.t_compose(transformList)
+
+        #---Outputs
+        output = transformCompose.apply(TestArray_3x3NumpyArray)
+        expected_output = np.array([[   24,    28,    2], \
+                                    [   36,    40,    5], \
+                                    [   48,    52,    8]])
+        #---Tests - note at edges of the images information is lost, so they're cut off
+        numpytest = np.testing.assert_almost_equal( output , expected_output, decimal=0 )
+        self.assertEqual( numpytest, None, "Should be None") 
+
+
+    def test_compose_order_3(self):
+        print("\nTesting :", self)
+
+        #---Inputs
+        transform1 = transform.t_linear(parameters = {'scale':1.0})
+        transform2 = transform.t_linear(parameters = {'scale':2.0})
+        transform3 = transform.t_linear(parameters = {'pre':5.0})
+        transformList = [transform1, transform3, transform2]
+        transformCompose = transform.t_compose(transformList)
+
+        #---Outputs
+        output = transformCompose.apply(TestArray_3x3NumpyArray)
+        expected_output = np.array([[    5,     7,    2], \
+                                    [   11,    13,    5], \
+                                    [   17,    19,    8]])
+        #---Tests - note at edges of the images information is lost, so they're cut off
+        numpytest = np.testing.assert_almost_equal( output , expected_output, decimal=1 )
+        self.assertEqual( numpytest, None, "Should be None") 
+
+
+    def test_compose_invert(self):
+        print("\nTesting :", self)
+
+        #---Inputs
+        transform1 = transform.t_linear(parameters = {'scale':30})
+        transform2 = transform.t_linear(parameters = {'scale':30}, reverse_flag=1)
+        transformList = [transform1, transform2]
+        test_object = transform.t_compose(transformList)
+        #---Outputs
+        output = test_object.invert(TestArray_5x5NumpyArray)
+        expected_output = transform2.invert(transform1.invert(TestArray_5x5NumpyArray))
+        
+        #---Tests - note at edges of the images information is lost, so they're cut off
+        numpytest = np.testing.assert_almost_equal( output , expected_output, decimal=1 )
+        self.assertEqual( numpytest, None, "Should be None") 
+
+    def test_compose_order_4(self):
+        print("\nTesting :", self)
+
+        #---Inputs
+        transform1 = transform.t_linear(parameters = {'scale':1.0})
+        transform2 = transform.t_linear(parameters = {'scale':2.0})
+        transform3 = transform.t_linear(parameters = {'pre':5.0})
+        transformList = [transform1, transform3, transform2]
+        transformCompose = transform.t_compose(transformList)
+
+        #---Outputs
+        output = transformCompose.invert(TestArray_3x3NumpyArray)
+        expected_output = np.array([[    -5,    -4.5,    2], \
+                                    [  -3.5,    -3.0,    5], \
+                                    [  -2.0,    -1.5,    8]])
+        #---Tests - note at edges of the images information is lost, so they're cut off
+        numpytest = np.testing.assert_almost_equal( output , expected_output, decimal=1 )
+        self.assertEqual( numpytest, None, "Should be None") 
+
+    def test_compose_order_apply_invert(self):
+        print("\nTesting :", self)
+
+        #---Inputs
+        transform1 = transform.t_linear(parameters = {'scale':1.0})
+        transform2 = transform.t_linear(parameters = {'scale':2.0})
+        transform3 = transform.t_linear(parameters = {'pre':5.0})
+        transformList = [transform1, transform3, transform2]
+        transform4 = transform.t_compose(transformList)
+        transformList2 = [transform1, transform2, transform3, transform4]
+        test_object = transform.t_compose(transformList2)
+
+        #---Outputs
+        output = test_object.apply(TestArray_3x3NumpyArray)
+        expected_output = np.array([[    20,    24,    2], \
+                                    [    32,    36,    5], \
+                                    [    44,    48,    8]])
+        #---Tests - note at edges of the images information is lost, so they're cut off
+        numpytest = np.testing.assert_almost_equal( output , expected_output, decimal=1 )
+        self.assertEqual( numpytest, None, "Should be None") 
+
+
+    def test_invert_reverse(self):
+        print("\nTesting :", self)
+
+        #---Inputs
+        transform1 = transform.t_linear(parameters = {'scale':2.0}, reverse_flag = 1)
+
+        #---Outputs
+        output = transform1.invert(TestArray_3x3NumpyArray)
+        expected_output = np.array([[    0,    2,    2], \
+                                    [  6,    8,    5], \
+                                    [  12,    14,    8]])
+        #---Tests - note at edges of the images information is lost, so they're cut off
+        numpytest = np.testing.assert_almost_equal( output , expected_output, decimal=1 )
+        self.assertEqual( numpytest, None, "Should be None") 
+
+
+    def test_compose_invert_reverse(self):
+        print("\nTesting :", self)
+
+        #---Inputs
+        transform1 = transform.t_linear(parameters = {'scale':1.0}, reverse_flag = 1)
+        transform2 = transform.t_linear(parameters = {'scale':2.0}, reverse_flag = 1)
+        transform3 = transform.t_linear(parameters = {'pre':5.0}, reverse_flag = 1)
+        transformList = [transform1, transform3, transform2]
+        transformCompose = transform.t_compose(transformList)
+
+        #---Outputs
+        output = transformCompose.invert(TestArray_3x3NumpyArray)
+        expected_output = np.array([[   5,    7,    2], \
+                                    [  11,    13,    5], \
+                                    [  17,   19,    8]])
+        #---Tests - note at edges of the images information is lost, so they're cut off
+        numpytest = np.testing.assert_almost_equal( output , expected_output, decimal=1 )
+        self.assertEqual( numpytest, None, "Should be None") 
+
 
 
 def run_specific_tests():
@@ -586,7 +776,6 @@ def run_specific_tests():
 
     runner = unittest.TextTestRunner()
     results = runner.run(big_suite)
-
 
 
 if __name__ == '__main__':

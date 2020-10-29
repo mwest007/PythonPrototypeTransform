@@ -23,7 +23,6 @@ class Transform(ABC):
         output_dim=None):
 
 
-
         """
         :type name: str
         :type parameters: dict
@@ -128,7 +127,24 @@ class Transform(ABC):
 
         return outdata
 
+    def invert(self, data, paddedmatrix=1):
+        """invert the transform for given parameters to the input array (data). 
+        
+        Parameters
+        ----------
+        data : np.array
+              array to be transformed
+        paddedmatrix : scalar {1|0}
+            A scalar indicating if padding is required around the array output. 
+            This pads the output array to match the input array with values from 
+            the input array. This is useful to return inverted transforms with 
+            the initial input values and dimensions. Set to default as default. 
 
+        Raises
+        ------
+        see apply
+        """
+        return self.apply(data, backward=1, paddedmatrix=paddedmatrix)
 
 
     def map(self, data=None, template=None, opts=None):
@@ -158,7 +174,7 @@ class Transform(ABC):
           extrapolated. Extrapolation is not supported by method “splinef2d”.
         8. Take the transpose
         
-        Note we're looking at a TRANSFORM map rather than an IMAGE map. In this the tranforms are the objects and Map is a verb, in D. Zarro, Map is noun
+        Note we're looking at a TRANSFORM map rather than an IMAGE map. In this the transforms are the objects and Map is a verb, in D. Zarro, Map is noun
         
         Parameters
         ----------
@@ -246,7 +262,7 @@ class t_linear(Transform):
 
     Parameters
     ----------
-    t_linear accepts tranform parameters as a dictionary { parameter:value} 
+    t_linear accepts transform parameters as a dictionary { parameter:value} 
 
     parameters{s, scale, Scale : np.array, python array, list or tuple 
         A scaling scalar, 1D vector, or matrix.  If you specify a scalar a 2-D 
@@ -382,7 +398,6 @@ class t_linear(Transform):
            [8.70,  3.06,  8.]])
     """
 
-
     def __init__(self, parameters, reverse_flag=None, name='t_linear',
                  input_coord=None, output_coord=None, input_unit=None, 
                  output_unit=None, input_dim=None, output_dim=None):
@@ -512,7 +527,7 @@ class t_linear(Transform):
                     self.input_dim = self.parameters['scale'].shape[0]
                     self.output_dim = self.parameters['scale'].shape[0]
                 else:
-                     warnings.warn("transform: t_linear: scale: Scalar detected assuming 2-D tranform")
+                     warnings.warn("transform: t_linear: scale: Scalar detected assuming 2-D transform")
                      self.parameters['scale'] = np.atleast_1d(np.array(self.parameters['scale']))
                      self.input_dim = 2
                      self.output_dim = 2                    
@@ -634,6 +649,7 @@ class t_linear(Transform):
         else:
             raise ValueError("transform: t_linear: reversetransform: trying to invert a non-invertible matrix.")
 
+
     def forwardtransform(self, data, backward=0, paddedmatrix=1):
         """apply the transform for given parameters to the input array (data). 
         The transforms are applied in this order:
@@ -723,11 +739,81 @@ class t_linear(Transform):
         return output_str
 
 class t_compose(Transform):
+    """Function composition
+
+    Function composition: f(g(x)), f(g(h(x))), f o g o h(x) ....
+
+    It combines multiple compositions into a single
+    list of transforms to be executed in order, from last to first (in
+    keeping with standard mathematical notation; [f, g, h]).  If one of the functions is
+    itself a composition, it is interpolated into the list rather than left
+    separate.
+
+    Output repr and str strings are composed of None parameters, except the name 
+    which lists the order of the transforms 
+
+    Parameters
+    ----------
+    t_compose accepts transforms as a list [transformF, transformG, transformH], 
+    these can be forward or reverse transforms, which is reflected in the 
+    output composition name
+
+    Returns
+    -------
+    apply: np.array
+        apply returns the composition of the input transforms.
+
+    invert: np.array
+        returns the indivudual transforms inverted
+
+
+    Other Parameters
+    ----------------
+    -
+
+    Raises
+    ------
+    see applicable transforms
+
+
+    See Also
+    --------
+    -
+
+    Notes
+    -----
+    -
+
+    References
+    ----------
+    -
+
+    Examples
+    --------
+    >>> InputArray = np.arange(9.0).reshape(3, 3)
+    >>> transform1 = transform.t_linear(parameters = {'scale':1.0})
+    >>> transform2 = transform.t_linear(parameters = {'scale':2.0})
+    >>> transform3 = transform.t_linear(parameters = {'pre':5.0})
+    >>> transformList = [transform1, transform2, transform3]
+    >>> transformCompose = transform.t_compose(transformList)
+    >>> output = transformCompose.apply(InputArray)
+    >>> array([[    5,     7,    2], \
+               [   11,    13,    5], \
+               [   17,    19,    8]])
+
+    >>> transformList = [transform1, transform3, transform2]
+    >>> transformCompose = transform.t_compose(transformList)
+    >>> output = transformCompose.invert(InputArray)
+    >>> array([[    -5,    -4.5,    2], \
+               [  -3.5,    -3.0,    5], \
+               [  -2.0,    -1.5,    8]])
+
+    """
+
     def __init__(self, transform_list, input_coord=None, input_unit=None, output_coord=None, output_unit=None,
                  parameters=None, reverse_flag=0, input_dim=None, output_dim=None):
 
-
-#---This bit creates the name.
+#---Name Composition
         self.function_list=[]
         self.inverseMatrix=None
 
@@ -751,7 +837,7 @@ class t_compose(Transform):
 
     def apply(self, data, backward=0, paddedmatrix=1):
 
-#---Check if array is invertable and set flag.
+#---Transform composition
         out_data = copy.copy(data)
         if backward:
             for singleTransform in reversed(self.function_list):
@@ -766,41 +852,7 @@ class t_compose(Transform):
 
 
 
-
-
-#---apply them following the repr example
-#---appply map each time    
-#---make out put a hash of name, parameters etc.    
-
-
-
 #Look in numpy book for the order of dimensionality. 
-#    def __repr__(self):
-
-#2. finish composition
 #3. Clean up arc, make sure still passes the tests
 #4. Look at order of dims 
-
-
-#what does super init do?
-
-#create while loop for t_list
-
-# this needs to perform multiple transforms
-# this needs to create a record in repr
-# needs to create a written record of what it has done
-
-#PErl code composition
-#A way to represent the transform so it's representable to person. this uses stringify. We also want to 
-#each subclass neeeds to urn itseldf intot a similar string.
-#in super class it reads name and forward/iverse flag
-# read forward and inverse out
-#use mgrid and broadcast in different directions
-
-
-# can we overlay operators in python??
-# tranform_list=[h,g,f]
-# f(g(h(x))) == composition([h, g, f]) or composition([f, g, h])
-# look at function composition in python to find standard but it seems like second is more common.
-# if composite is handed to composite then lists get combined. Look at object type. 
 
